@@ -1,0 +1,319 @@
+#!/usr/bin/env bash
+# Kernel build:  http://www.debian.org/releases/stable/i386/ch08s06.html.en
+SETUP_APT=""
+BUILD_PHP=""
+BUILD_SELIX=""
+BUILD_SYSSTAT=""
+function usage {
+	echo "Usage: $0 [--all|-a] [--apt] [--php] [--selix] [--sysstat]"
+	quit 1
+}
+
+function quit {
+	cd "$old_cwd"
+	if (( $1 > 0 )) ; then echo -e "\n*** Aborted due to previous errors" ; fi
+	exit $1
+}
+
+# Initialize variables
+old_cwd=$( pwd )
+abspath=$(cd ${0%/*} && echo $PWD/${0##*/})
+cwd=$( dirname "$abspath" )
+ecwd=$( echo $cwd | sed 's/\//\\\//g' )
+
+# Evaluate options
+newopts=$( getopt -n"$0" --longoptions "all,apt,php,selix,sysstat,help" "ah" "$@" ) || usage
+set -- $newopts
+while (( $# >= 0 ))
+do
+	case "$1" in
+		--all | -a)		SETUP_APT=1; BUILD_PHP=1; BUILD_SELIX=1; BUILD_SYSSTAT=1;shift;;
+		--apt)			SETUP_APT=1;shift;;
+		--php)			BUILD_PHP=1;shift;;
+		--selix)		BUILD_SELIX=1;shift;;
+		--sysstat)		BUILD_SYSSTAT=1;shift;;
+		--help | -h) usage;;
+		--) shift;break;;
+	esac
+done
+
+# Change to script directory
+cd "$cwd"
+
+# Script must be run as root
+if [[ $( whoami ) != "root" ]]
+then
+	echo "*** This script must be run as root" >&2 && quit 1
+fi
+
+#### APT
+if [[ $SETUP_APT != "" ]]
+then
+	echo '
+	# Main
+	deb http://ftp.it.debian.org/debian/ squeeze main contrib non-free
+	deb-src http://ftp.it.debian.org/debian/ squeeze main contrib non-free
+
+	# Security
+	deb http://security.debian.org/ squeeze/updates main contrib non-free
+	deb-src http://security.debian.org/ squeeze/updates main contrib non-free
+
+	# Updates
+	deb http://ftp.it.debian.org/debian/ squeeze-updates main contrib non-free
+	deb-src http://ftp.it.debian.org/debian/ squeeze-updates main contrib non-free
+
+	# Backports
+	deb http://backports.debian.org/debian-backports squeeze-backports main contrib non-free
+
+	# DotDeb
+	deb http://packages.dotdeb.org squeeze all
+	deb-src http://packages.dotdeb.org squeeze all
+	' > /etc/apt/sources.list
+	apt-key adv --keyserver hkp://keys.gnupg.net --recv-keys 89DF5277
+	apt-get update
+	apt-get install autoconf automake fakeroot build-essential kernel-package selinux-basics \
+			libselinux1-dev selinux-policy-dev gawk re2c pkg-config texinfo libtool \
+			libxml2-dev libbz2-dev libgd2-noxpm libjpeg8-dev libcurl4-gnutls-dev \
+			libvpx-dev libpng12-dev libxpm-dev libonig-dev libmcrypt-dev git libglib2.0-dev \
+			uuid-dev libpopt-dev bison libssl-dev
+	apt-get install nginx apache2-mpm-prefork apache2-prefork-dev mysql-server-5.5 libmysqlclient-dev
+fi
+
+#### System
+echo "
+*               soft    nofile          999999
+*               hard    nofile          999999
+root            soft    nofile          999999
+root            hard    nofile          999999
+" > /etc/security/limits.d/nofile
+sysctl -w vm.oom_kill_allocating_task=1 || quit 1
+#sysctl -w vm.drop_caches=3 || quit 1
+echo "vm.oom_kill_allocating_task = 1" > /etc/sysctl.d/oom_kill.conf
+#echo "vm.drop_caches = 3" > /etc/sysctl.d/drop_caches.conf
+swapoff -a || quit 1
+
+#### LTTng
+# if [[ ! -d ~/LTTng ]]
+# then
+# 	mkdir ~/LTTng
+# 	git clone git://git.lttng.org/userspace-rcu.git ~/LTTng/userspace-rcu
+# 	git clone git://git.lttng.org/lttng-ust.git ~/LTTng/lttng-ust
+# 	git clone git://git.lttng.org/lttng-tools.git ~/LTTng/lttng-tools
+# 	git clone git://git.efficios.com/babeltrace.git ~/LTTng/babeltrace
+# fi
+#cd ~/LTTng/userspace-rcu && ./bootstrap && ./configure --prefix=/usr && make && make install
+#cd ~/LTTng/lttng-ust && ./bootstrap && ./configure --prefix=/usr && make && make install
+#cd ~/LTTng/lttng-tools && ./bootstrap && ./configure --prefix=/usr && make && make install
+#cd ~/LTTng/babeltrace && ./bootstrap && ./configure --prefix=/usr && make && make install
+
+#### PHP
+if [[ ! -d ~/php ]]
+then
+	git clone -b PHP-5.4 git://github.com/php/php-src.git ~/php || quit 1
+fi
+cd ~/php
+mkdir -p /etc/php/conf.d
+if [[ $BUILD_PHP != "" ]]
+then
+	# export LIBS="-llttng-ust -lrt -ldl"
+	./buildconf
+	./configure --prefix=/usr --enable-debug --enable-fpm --enable-cli --with-apxs2=/usr/bin/apxs2 --disable-cgi \
+		--with-fpm-user=www-data --with-fpm-group=www-data --with-config-file-path=/etc/php \
+		--with-config-file-scan-dir=/etc/php/conf.d --sysconfdir=/etc --localstatedir=/var \
+		--mandir=/usr/share/man --with-regex=php --disable-rpath --disable-static \
+		--with-pic --with-layout=GNU --with-pear=/usr/share/php --enable-calendar --enable-fileinfo \
+		--enable-hash --enable-json --enable-sysvsem --enable-sysvshm --enable-sysvmsg --enable-bcmath \
+		--with-bz2 --enable-ctype --without-gdbm --with-iconv --enable-exif --enable-ftp --with-gettext \
+		--enable-mbstring --with-onig=/usr --with-pcre-regex --with-mysql=mysqlnd \
+		--with-mysql-sock=/var/run/mysqld/mysqld.sock --with-mysqli=mysqlnd --enable-pdo --with-pdo-mysql \
+		--with-pdo-pgsql=shared,/usr/bin/pg_config --with-sqlite3 --with-pdo-sqlite --disable-phar \
+		--enable-shmop --enable-sockets --enable-simplexml --enable-dom --enable-wddx \
+		--with-libxml-dir=/usr --enable-tokenizer --with-zlib --with-kerberos=/usr --with-openssl=/usr \
+		--enable-soap --enable-zip --with-mhash=yes --without-mm --without-sybase-ct --without-mssql \
+		--with-curl --with-gd --with-mcrypt --without-pear || quit 1
+	make && make install
+	# export LIBS=""
+fi
+mkdir -p /etc/php/conf.d
+mkdir -p /etc/php/fpm-pool.d
+touch /etc/php/php.ini
+#### FPM configuration
+echo '
+pid = /var/run/php-fpm.pid
+error_log = /var/log/php-fpm.log
+log_level = notice
+daemonize = yes
+include=/etc/php/fpm-pool.d/*.conf
+' > /etc/php/fpm.conf
+#### PHP configuration
+echo '
+[PHP]
+max_execution_time = 300
+max_input_time = 60
+memory_limit = 512M
+auto_globals_jit = Off
+post_max_size = 8M
+disable_functions = eval
+engine = On
+short_open_tag = Off
+asp_tags = Off
+precision = 14
+y2k_compliance = On
+output_buffering = 4096
+zlib.output_compression = Off
+implicit_flush = Off
+unserialize_callback_func =
+serialize_precision = 17
+allow_call_time_pass_reference = Off
+safe_mode = Off
+expose_php = On
+error_reporting = E_ALL | E_STRICT
+display_errors = On
+display_startup_errors = On
+log_errors = On
+report_memleaks = On
+track_errors = Off
+html_errors = Off
+error_log = /var/log/php_errors.log
+variables_order = "GPCS"
+request_order = "GP"
+register_globals = Off
+register_long_arrays = Off
+register_argc_argv = Off
+magic_quotes_gpc = Off
+magic_quotes_runtime = Off
+magic_quotes_sybase = Off
+default_mimetype = "text/html"
+enable_dl = Off
+file_uploads = On
+upload_max_filesize = 2M
+max_file_uploads = 20
+allow_url_fopen = On
+allow_url_include = On
+default_socket_timeout = 60
+
+[Date]
+date.timezone = "Europe/Rome"
+
+[Pdo_mysql]
+pdo_mysql.cache_size = 2000
+pdo_mysql.default_socket=
+
+[Syslog]
+define_syslog_variables  = Off
+
+[mail function]
+SMTP = localhost
+smtp_port = 25
+mail.add_x_header = On
+
+[SQL]
+sql.safe_mode = Off
+
+[MySQL]
+mysql.allow_local_infile = On
+mysql.allow_persistent = On
+mysql.cache_size = 2000
+mysql.max_persistent = -1
+mysql.max_links = -1
+mysql.default_port =
+mysql.default_socket =
+mysql.connect_timeout = 60
+mysql.trace_mode = Off
+
+[MySQLi]
+mysqli.max_persistent = -1
+mysqli.allow_persistent = On
+mysqli.max_links = -1
+mysqli.cache_size = 2000
+mysqli.default_port = 3306
+mysqli.default_socket =
+mysqli.reconnect = Off
+
+[mysqlnd]
+mysqlnd.collect_statistics = Off
+mysqlnd.collect_memory_statistics = Off
+
+[PostgresSQL]
+pgsql.allow_persistent = On
+pgsql.auto_reset_persistent = Off
+pgsql.max_persistent = -1
+pgsql.max_links = -1
+pgsql.ignore_notice = 0
+pgsql.log_notice = 0
+
+[Session]
+session.save_handler = files
+session.use_cookies = 1
+session.use_only_cookies = 1
+session.name = PHPSESSID
+session.auto_start = 0
+session.cookie_lifetime = 0
+session.cookie_path = /
+session.cookie_domain =
+session.cookie_httponly =
+session.serialize_handler = php
+session.gc_probability = 1
+session.gc_divisor = 1000
+session.gc_maxlifetime = 1440
+session.bug_compat_42 = Off
+session.bug_compat_warn = Off
+session.referer_check =
+session.entropy_length = 0
+session.cache_limiter = nocache
+session.cache_expire = 180
+session.use_trans_sid = 0
+session.hash_function = 0
+session.hash_bits_per_character = 5
+url_rewriter.tags = "a=href,area=href,frame=src,input=src,form=fakeentry"
+
+[Tidy]
+tidy.clean_output = Off
+
+[soap]
+soap.wsdl_cache_enabled=1
+soap.wsdl_cache_dir="/tmp"
+soap.wsdl_cache_ttl=86400
+soap.wsdl_cache_limit = 5
+' > /etc/php/php.ini
+
+#### SELIX
+if [[ ! -d ~/selix ]]
+then
+	git clone git://github.com/ettoredn/selix.git ~/selix || quit 1
+fi
+if [[ $BUILD_SELIX != "" ]]
+then
+	cd ~/selix && phpize --clean && phpize && ./configure && make && make install
+fi
+
+#### SYSSTAT
+if [[ ! -d ~/sysstat-10.0.5 ]]
+then
+	cd ~ && wget http://pagesperso-orange.fr/sebastien.godard/sysstat-10.0.5.tar.bz2 && tar xjf sysstat-10.0.5.tar.bz2
+fi
+if [[ $BUILD_SYSSTAT != "" ]]
+then
+	cd ~/sysstat-10.0.5 && ./configure --prefix=/usr && make && make install
+fi
+
+#### APACHE
+echo '
+NameVirtualHost *:81
+Listen 81
+' > /etc/apache2/ports.conf
+
+#### NGINX
+rm -f /etc/nginx/sites-enabled/default
+
+#### WEBROOT
+if [[ $( mount | egrep webroot ) == "" ]]
+then
+	rm -rf ~/webroot
+	rm -rf /dev/shm/webroot
+	mkdir ~/webroot || quit 1
+	mkdir /dev/shm/webroot || quit 1
+	touch ~/webroot/this.is.the.old.one
+	mount --bind /dev/shm/webroot ~/webroot || quit 1
+	cp -R ./app_wordpress/ ~/webroot/wordpress
+fi
