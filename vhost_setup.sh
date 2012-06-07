@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 VHOSTS=10
+FPM_CHILDREN=5
+FPM_REQUESTS=0
 APPEND_HOSTNAME=".selixperf.dev"
 TEMPLATE_FPM='[{NAME}]
 listen = /var/run/php-fpm/{SOCK_NAME}.sock
@@ -8,12 +10,12 @@ listen.mode = 0666
 
 user = {USER}
 group = {GROUP}
-pm = dynamic
-pm.max_children = 1000
-pm.start_servers = 5
-pm.min_spare_servers = 5
-pm.max_spare_servers = 5
-pm.max_requests = 1
+pm = static
+pm.max_children = {CHILDREN}
+pm.max_requests = {REQUESTS}
+;pm.start_servers = 5
+;pm.min_spare_servers = 5
+;pm.max_spare_servers = 5
 ;pm.status_path = /status'
 TEMPLATE_NGINX='upstream fpms {
 {SOCKS}
@@ -37,7 +39,7 @@ server {
 '
 
 function usage {
-	echo "Usage: $0 [--count=N]"
+	echo "Usage: $0 [--vhosts n] [--children n] [--requests n]"
 	quit 1
 }
 
@@ -54,21 +56,36 @@ cwd=$( dirname "$abspath" )
 ecwd=$( echo $cwd | sed 's/\//\\\//g' )
 
 # Evaluate options
-newopts=$( getopt -n"$0" --longoptions "count:,help" "h" "$@" ) || usage
+newopts=$( getopt -n"$0" --longoptions "vhosts:,children:,requests:,help" "h" "$@" ) || usage
 set -- $newopts
 while (( $# >= 0 ))
 do
 	case "$1" in
-		--count)	VHOSTS=$( echo $2 | sed "s/'//g" )
+		--vhosts)	VHOSTS=$( echo $2 | sed "s/'//g" )
 					if (( VHOSTS < 1 ))
 					then
-						echo "*** count argument must be > 0" >&2 && quit 1
+						echo "*** vhosts argument must be > 0" >&2 && quit 1
+					fi
+					shift;shift;;
+		--children)	FPM_CHILDREN=$( echo $2 | sed "s/'//g" )
+					if (( FPM_CHILDREN < 1 ))
+					then
+						echo "*** children argument must be > 0" >&2 && quit 1
+					fi
+					shift;shift;;
+		--requests)	FPM_REQUESTS=$( echo $2 | sed "s/'//g" )
+					if (( FPM_REQUESTS < 0 ))
+					then
+						echo "*** requests argument must be > -1" >&2 && quit 1
 					fi
 					shift;shift;;
 		--help | -h) usage;;
 		--) shift;break;;
 	esac
 done
+
+echo "$VHOSTS vhosts, $FPM_CHILDREN children, $FPM_REQUESTS requests, \
+$(( $VHOSTS * $FPM_CHILDREN )) processes"
 
 # Change to script directory
 cd "$cwd"
@@ -79,7 +96,7 @@ then
 	echo "*** This script must be run as root" >&2 && quit 1
 fi
 
-# Remove all present pools
+# Remove all active pools
 rm /etc/php/fpm-pool.d/*.conf
 for (( i=1; i<=$VHOSTS; i++ ))
 do
@@ -91,7 +108,7 @@ do
 	# Add user
 	if [[ $( cat /etc/passwd | egrep "^$vhost_name" ) == "" ]]
 	then
-		adduser --no-create-home --disabled-password --gecos dummy "$vhost_name" || quit 1
+		adduser --no-create-home --disabled-password --gecos dummy "$vhost_name" &>/dev/null || quit 1
 	fi
 
 	# Create FPM pool
@@ -100,6 +117,8 @@ do
 	pool_conf=$( echo "$pool_conf" | sed 's/{SOCK_NAME}/'"$vhost_name"'/g' )
 	pool_conf=$( echo "$pool_conf" | sed 's/{USER}/'"$vhost_name"'/g' )
 	pool_conf=$( echo "$pool_conf" | sed 's/{GROUP}/'"$vhost_name"'/g' )
+	pool_conf=$( echo "$pool_conf" | sed 's/{CHILDREN}/'"$FPM_CHILDREN"'/g' )
+	pool_conf=$( echo "$pool_conf" | sed 's/{REQUESTS}/'"$FPM_REQUESTS"'/g' )
 	echo "$pool_conf" > "/etc/php/fpm-pool.d/$vhost_name.conf" || quit 1
 	
 	nginx_socks="$nginx_socks        server unix:/var/run/php-fpm/$vhost_name.sock;
