@@ -50,13 +50,24 @@ set -- $newopts
 while (( $# >= 0 ))
 do
 	case "$1" in
-		--use-last-session)	sql="SELECT session FROM $DB_TABLE_TEST ORDER BY session DESC LIMIT 1;"
-					last_session=$( echo "$sql" | mysql -u "$DB_USER" -p"$DB_PASS" -D "$DB_DATABASE" | tail -1 )
+		--use-last-session)	sql="SELECT session,perf_connections,perf_rate FROM $DB_TABLE_TEST ORDER BY session DESC LIMIT 1;"
+					row=$( echo "$sql" | mysql -u "$DB_USER" -p"$DB_PASS" -D "$DB_DATABASE" | tail -1 )
+					last_session=$( echo $row | awk '{print $1}' )
+					last_conn=$( echo $row | awk '{print $2}' )
+					last_rate=$( echo $row | awk '{print $3}' )
 					if [[ "$last_session" != "" ]]
 					then
 						if [[ $last_session != ${last_session//[^0-9]/} ]]
 						then
 							echo "*** Unable to retrieve last session id" >&2 && quit 1
+						fi
+						if [[ $last_conn != ${last_conn//[^0-9]/} ]]
+						then
+							echo "*** Unable to retrieve last session connection number" >&2 && quit 1
+						fi
+						if [[ $last_rate != ${last_rate//[^0-9]/} ]]
+						then
+							echo "*** Unable to retrieve last session connection rate" >&2 && quit 1
 						fi
 						perf_session="$last_session"
 					fi
@@ -102,6 +113,9 @@ do
 	esac
 done
 
+if [[ "$last_conn" != "" ]]; then PERF_CONN="$last_conn"; fi
+if [[ "$last_rate" != "" ]]; then PERF_RATE="$last_rate"; fi
+
 # --conf must be defined
 if [[ $CONFIG = "" ]]
 then
@@ -125,7 +139,7 @@ then
 fi
 
 echo -ne "Executing vhosts setup script on remote host $SERVER ...\n\t"
-vhost_info=$( ssh "$SERVER_USER@$SERVER_HOST" "$SETUP_SCRIPT $VHOSTS $FPM_CHILDREN $FPM_REQUESTS")
+vhost_info=$( ssh "$SERVER_USER@$SERVER_HOST" "$SETUP_SCRIPT $VHOSTS $FPM_CHILDREN $FPM_REQUESTS" | head -1)
 if [[ $? != 0 ]]
 then
 	echo "*** Error executing vhosts setup script" >&2 && quit 1
@@ -138,11 +152,16 @@ VHOSTS="${tokens[0]}"
 FPM_CHILDREN="${tokens[1]}"
 FPM_REQUESTS="${tokens[2]}"
 
+if (( PERF_RATE > FPM_CHILDREN ))
+then
+	echo "*** Connection rate ($PERF_RATE) must be <= than children ($FPM_CHILDREN)" >&2 && quit 1
+fi
 echo -ne "\nExecuting sysstat on remote host ...\n\t"
 ssh "$SERVER_USER@$SERVER_HOST" "rm perf.sa"
 ssh "$SERVER_USER@$SERVER_HOST" "sar 1 -o perf.sa &>/dev/null &" || quit 1
 sar_pid=$( ssh "$SERVER_USER@$SERVER_HOST" "ps -eF" | egrep 'sar 1 -o perf' | egrep -v 'egrep' | awk '{print $2}' )
 echo "PID: $sar_pid"
+sleep 1
 
 echo -ne "\nExecuting "
 httperf --hog --server="$SERVER_HOST" --uri="$PERF_URI" --num-con="$PERF_CONN" --rate="$PERF_RATE" || quit 1
