@@ -3,3 +3,7 @@
 .AppleDouble/.Parent
 ._*
 *.bak
+.idea/
+
+# Project
+performance_viewer/data/

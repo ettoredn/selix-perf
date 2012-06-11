@@ -43,6 +43,7 @@ abspath=$(cd ${0%/*} && echo $PWD/${0##*/})
 cwd=$( dirname "$abspath" )
 ecwd=$( echo $cwd | sed 's/\//\\\//g' )
 perf_session=$( date +%s )
+perf_test=$( date +%s )
 
 # Evaluate options
 newopts=$( getopt -n"$0" --longoptions "use-last-session,conf:,server:,vhosts:,children:,requests:,uri:,conn:,rate:,help" "h" "$@" ) || usage
@@ -161,9 +162,9 @@ ssh "$SERVER_USER@$SERVER_HOST" "rm perf.sa"
 ssh "$SERVER_USER@$SERVER_HOST" "sar 1 -o perf.sa &>/dev/null &" || quit 1
 sar_pid=$( ssh "$SERVER_USER@$SERVER_HOST" "ps -eF" | egrep 'sar 1 -o perf' | egrep -v 'egrep' | awk '{print $2}' )
 echo "PID: $sar_pid"
-sleep 1
+sleep 2
 
-echo -ne "\nExecuting "
+echo -e "\nExecuting httperf, estimated time $(( PERF_CONN / PERF_RATE ))s ..."
 httperf --hog --server="$SERVER_HOST" --uri="$PERF_URI" --num-con="$PERF_CONN" --rate="$PERF_RATE" || quit 1
 
 kill_sysstat
@@ -180,23 +181,23 @@ do
 	(( secs++ ))
 	cpu_user="${tokens[4]}"
 	cpu_system="${tokens[6]}"
-	# cpu_iowait="${tokens[7]}"
+	cpu_iowait="${tokens[7]}"
 	cpu_idle="${tokens[9]}"
 	mem_used_kb="${tokens[11]}"
 	mem_used="${tokens[12]}"
 	
 	sql="INSERT INTO $DB_TABLE_SA \
-		(session, configuration, seconds_elapsed, cpu_user, cpu_system, cpu_idle, mem_used_kb, mem_used) \
-		VALUES( $perf_session, '$CONFIG', $secs, $cpu_user, $cpu_system, $cpu_idle, $mem_used_kb, \
+		(test, seconds_elapsed, cpu_user, cpu_system, cpu_iowait, cpu_idle, mem_used_kb, mem_used) \
+		VALUES( $perf_test, $secs, $cpu_user, $cpu_system, $cpu_iowait, $cpu_idle, $mem_used_kb, \
 		$mem_used );"
 	echo $sql >> "$sqltmpfile"
 	
 	echo "($secs) user $cpu_user%, sys $cpu_system%, idle $cpu_idle%, mem $mem_used_kb, mem $mem_used%"
 done <<< "$( ssh "$SERVER_USER@$SERVER_HOST" "sadf -dht -- -ru perf.sa" )"
 
-echo "INSERT INTO $DB_TABLE_TEST (session, configuration, vhosts, children, \
+echo "INSERT INTO $DB_TABLE_TEST (test, session, configuration, vhosts, children, \
  	  child_requests, perf_connections, perf_rate) \
-	VALUES( $perf_session, '$CONFIG', $VHOSTS, $FPM_CHILDREN, $FPM_REQUESTS, $PERF_CONN, $PERF_RATE );" >> "$sqltmpfile"
+	VALUES( $perf_test, $perf_session, '$CONFIG', $VHOSTS, $FPM_CHILDREN, $FPM_REQUESTS, $PERF_CONN, $PERF_RATE );" >> "$sqltmpfile"
 
 echo "COMMIT;" >> "$sqltmpfile"
 mysql -u "$DB_USER" -p"$DB_PASS" -D "$DB_DATABASE" < "$sqltmpfile" || quit 1
