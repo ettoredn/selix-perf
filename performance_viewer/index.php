@@ -88,62 +88,18 @@ if (!empty($_GET['session']))
     // Catch verbose output
     ob_start();
 
-    $s = new Session($id);
-    $cpuUsage = $s->PlotCPUUsageByConfig( "fpm", "vhosts" );
-//    $tests = $s->GetTests();
-//    $byConfig = TestSetUtils::FilterBy($tests, array("GetConfiguration", null), "iotest");
-//    $byConfig = $tests;
-//    print_r( TestSetUtils::GroupBy($byConfig, array("GetVhosts", null)));
+    try {
+        $s = new Session( $id );
+    } catch (ErrorException $e)
+    { die("<p>Session $id doesn't exist</p>"); }
 
-    // Plot CPU usage of tests with different number of vhosts and fixed configuration
-//    $s->PlotCPUByConfig("config");
-
-    // Plot CPU usage of tests with different configurations and fixed number of vhosts
-//    $s->PlotCPUByVhosts(20);
-
-
-//    try {
-//        $s = new Session( $id );
-//    } catch (ErrorException $e)
-//    { die("<p>Session $id doesn't exist</p>"); }
-//
-//    $raw = $s->GetRawResults();
-//    $helloworld = $s->PlotBenchmark("helloworld", array(
-//        "zend_compile",
-//        "zend_execute",
-//    ));
-//    $compile = $s->PlotBenchmark("compile", array(
-//        "zend_first_compile",
-//        "zend_compile",
-//    ));
-//    $function = $s->PlotBenchmark("function", array(
-////        "zendvm_first_user_fcall",
-//        "zendvm_user_fcall",
-//        "zendvm_internal_fcall",
-//    ));
-//    $helloworldDelta = $s->PlotBenchmarkDelta("helloworld", array(
-//        "zend_compile",
-//        "zend_execute",
-//    ), "php");
-//    $compileDelta = $s->PlotBenchmarkDelta("compile", array(
-//        "zend_first_compile",
-//        "zend_compile",
-//    ), "php");
-//    $functionDelta = $s->PlotBenchmarkDelta("function", array(
-////        "zendvm_first_user_fcall",
-//        "zendvm_user_fcall",
-//        "zendvm_internal_fcall",
-//    ), "php");
+    $cpuUsage = $s->PlotRelativeResourceUsage( "GetCPUUsage", array("GetConfiguration" => "fpm"), "GetVhosts" );
+    $raw = $s->GetData("GetCPUUsage", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
 
     // Get verbose output produced
     $verbose = ob_get_clean();
 
     echo "<img src='$cpuUsage' width='731' height='549'/>";
-//    echo "<img src='$compile' width='731' height='549'/>";
-//    echo "<img src='$function' width='731' height='549'/>";
-//    echo "<img src='$helloworldDelta' width='731' height='549'/>";
-//    echo "<img src='$compileDelta' width='731' height='549'/>";
-//    echo "<img src='$functionDelta' width='731' height='549'/>";
 
     echo '<p><a href="javascript:void(0)" onclick="switchRawData();">Show/hide raw data</a></p>';
     echo "<pre id='rawData' style='display: none;'>".print_r($raw, true)."</pre>";
