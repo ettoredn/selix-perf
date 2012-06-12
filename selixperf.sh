@@ -162,7 +162,7 @@ ssh "$SERVER_USER@$SERVER_HOST" "rm perf.sa"
 ssh "$SERVER_USER@$SERVER_HOST" "sar 1 -o perf.sa &>/dev/null &" || quit 1
 sar_pid=$( ssh "$SERVER_USER@$SERVER_HOST" "ps -eF" | egrep 'sar 1 -o perf' | egrep -v 'egrep' | awk '{print $2}' )
 echo "PID: $sar_pid"
-sleep 2
+sleep 5
 
 echo -e "\nExecuting httperf, estimated time $(( PERF_CONN / PERF_RATE ))s ..."
 httperf --hog --server="$SERVER_HOST" --uri="$PERF_URI" --num-con="$PERF_CONN" --rate="$PERF_RATE" || quit 1

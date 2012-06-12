@@ -102,9 +102,10 @@ class Session
         $filterByValue = array_values($filterBy)[0];
 
         $filename = $this->GetId()."_".$resourceProperty."_".$filterByProperty."_".$filterByValue."_".$groupByProperty.".png";
-        $cleanResource = preg_replace('/Usage$/', '',preg_replace('/^Get/', '', $resourceProperty));
+        $cleanResource = preg_replace('/^Get/', '', $resourceProperty);
         $cleanFilter = strtolower(preg_replace('/^Get/', '', $filterByProperty));
-        $title = $cleanResource ." usage with $cleanFilter = $filterByValue";
+        $cleanGroupBy = strtolower(preg_replace('/^Get/', '', $groupByProperty));
+        $title = $cleanResource ." with $cleanFilter $filterByValue  (".($this->httpConnectionsRate)." connections/sec)";
 
         // If already generated returns it
         if (file_exists(Gnuplot::DATAPATH.$filename) && !$GLOBALS['disable_cache'])
@@ -122,7 +123,7 @@ class Session
         foreach ($data as $groupedValue => $values)
         {
             // Header
-            $plotData[$column][] = "\"$groupByProperty = $groupedValue\"";
+            $plotData[$column][] = "\"$cleanGroupBy = $groupedValue\"";
 
             foreach ($values as $sa)
                 $plotData[$column][] = $sa;
@@ -174,55 +175,92 @@ class Session
         return Gnuplot::DATAPATH.$filename;
     }
 
+    /**
+     * @param string $resourceProperty
+     * @param array $filterBy
+     * @param string $groupByProperty
+     * @return string PNG image filename
+     * @throws ErrorException
+     */
+    public function PlotResourceUsage( $resourceProperty, $filterBy, $groupByProperty )
+    {
+        if (empty($resourceProperty) || !is_array($filterBy) || count($filterBy) < 1 || empty($groupByProperty))
+            throw new ErrorException('empty($resourceProperty) || !is_array($filterBy) || count($filterBy) < 1 || empty($groupByProperty)');
+
+        // Supports only one filter criteria
+        $filterByProperty = array_keys($filterBy)[0];
+        $filterByValue = array_values($filterBy)[0];
+
+        $filename = $this->GetId()."_".$resourceProperty."_".$filterByProperty."_".$filterByValue."_".$groupByProperty.".png";
+        $cleanResource = preg_replace('/^Get/', '', $resourceProperty);
+        $cleanFilter = strtolower(preg_replace('/^Get/', '', $filterByProperty));
+        $cleanGroupBy = strtolower(preg_replace('/^Get/', '', $groupByProperty));
+        $title = $cleanResource ." with $cleanFilter $filterByValue  (".($this->httpConnectionsRate)." connections/sec)";
+
+        // If already generated returns it
+        if (file_exists(Gnuplot::DATAPATH.$filename) && !$GLOBALS['disable_cache'])
+            return Gnuplot::DATAPATH.$filename;
+
+        $data = $this->GetData($resourceProperty, array($filterByProperty => array(null, $filterByValue)), array($groupByProperty => null));
+        if (empty($data) || !is_array($data))
+            throw new ErrorException("[".__METHOD__."] empty data set!");
+
+        // Build plot data for gnuplot
+        $plotData = array(array());
+
+        // Write entries by column
+        $column = 0;
+        foreach ($data as $groupedValue => $values)
+        {
+            // Header
+            $plotData[$column][] = "\"$cleanGroupBy = $groupedValue\"";
+
+            foreach ($values as $sa)
+                $plotData[$column][] = $sa;
+
+            $column++;
+        }
+
+        /*
+         * Transforms $plotData in an array where each entry represents a row.
+         */
+        // The number of samples is taken from the smallest set
+        $samples = count($plotData[0]);
+        foreach ($plotData as $columnData)
+            if (count($columnData) < $samples)
+                $samples = count($columnData);
+
+        $res = array();
+        for ($row=0; $row < $samples; $row++)
+            foreach ($plotData as $column => $columnData)
+                    $res[$row][$column] = $columnData[$row];
+
+        // Implode entries
+        foreach ($res as $key => $entry)
+            $plotData[$key] = implode(" ", $entry);
+
+    //        print_r($plotData);
+
+        // Build plot arguments
+        $plotArgs = array();
+        $plotDataArgs = array();
+        for ($i=0; $i < count($data); $i++)
+        {
+            $plotArgs[] =
+                    'using :($'.($i+1).') title columnhead('.($i+1).') smooth csplines';
+            $plotDataArgs[] = $plotData; // $plotData must be repeated for each configuration
+        }
+    //        print_r(implode("\n", $plotArgs));
+
+        $plot = new Gnuplot();
+        $plot->Open();
+        $plot->SetPlotStyle(new LinesPlotStyle()); // Reset
+        $plot->SetYLabel("usage [MiB]");
+        $plot->SetXLabel("time [seconds]");
+        $plot->PlotDataToPNG($title, $filename, $plotArgs, $plotDataArgs, "1024,768");
+        $plot->Close();
+    //        print_r(implode("\n",$plot->GetLog()));
+
+        return Gnuplot::DATAPATH.$filename;
+    }
 }
-//    /*
-//     * Returns null if no cache entry is found
-//     */
-//    protected function GetCachedRawResult( $config )
-//    {
-//        if (empty($config))
-//            throw new ErrorException('!empty($config)');
-//
-//        if ($GLOBALS['disable_cache'])
-//            return null;
-//
-//            $q = "SELECT data
-//              FROM ". Database::SESSION_CACHE_TABLE ."
-//              WHERE session=". $this->GetId() ."
-//              AND baseline_configuration='". $config ."'";
-//        $r = Database::GetConnection()->query($q);
-//        if (!$r || $r->rowCount() > 1) throw new ErrorException("Too much cache entries for session ".$this->GetId());
-//
-//        if ($r->rowCount() == 0)
-//            // No cache
-//            return null;
-//
-//        $result = $r->fetch(PDO::FETCH_NUM); $result = unserialize($result[0]);
-//
-//        if (empty($result))
-//            throw new ErrorException('!$result');
-//
-//        return $result;
-//    }
-//
-//    protected function AddRawResultToCache( $config, $result )
-//    {
-//        if (empty($config) || empty($result))
-//            throw new ErrorException('!empty($config) || empty($result)');
-//
-//        if ($GLOBALS['disable_cache'])
-//            return null;
-//
-//        $serialized = serialize($result);
-//
-//        $q = "INSERT INTO ". Database::SESSION_CACHE_TABLE ."
-//              (session, baseline_configuration, data)
-//              VALUES(:session, :baseconf, :data)";
-//        $st = Database::GetConnection()->prepare($q);
-//        $st->bindParam(':session', $this->GetId(), PDO::PARAM_INT);
-//        $st->bindParam(':baseconf', $config, PDO::PARAM_STR, strlen($config));
-//        $st->bindParam(':data', $serialized, PDO::PARAM_STR, strlen($serialized));
-//        if ($st->execute() != 1)
-//            throw new ErrorException('Error adding session raw result to cache!');
-//    }
-//

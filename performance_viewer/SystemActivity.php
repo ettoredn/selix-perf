@@ -8,7 +8,7 @@ class SystemActivity
     private $CPUSystem;
     private $CPUIOwait;
     private $CPUIdle;
-    private $memUsed_kb;
+    private $memUsedKiB;
     private $memUsed;
     private $secondsElapsed;
 
@@ -23,7 +23,7 @@ class SystemActivity
         $this->CPUSystem = $sa['cpu_system'];
         $this->CPUIOwait = $sa['cpu_iowait'];
         $this->CPUIdle = $sa['cpu_idle'];
-        $this->memUsed_kb = $sa['mem_used_kb'];
+        $this->memUsedKiB = $sa['mem_used_kb'];
         $this->memUsed = $sa['mem_used'];
         $this->secondsElapsed = $sa['seconds_elapsed'];
     }
@@ -48,6 +48,9 @@ class SystemActivity
 
     public function GetMemoryUsed()
     { return $this->memUsed; }
+
+    public function GetMemoryUsedKiB()
+    { return $this->memUsedKiB; }
 
     public function GetSecondsElapsed()
     { return $this->secondsElapsed; }

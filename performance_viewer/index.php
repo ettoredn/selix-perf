@@ -44,40 +44,44 @@ $disable_cache = true;
 <?php
 
 // Generate benchmarks list
-//$q = "SELECT session id, benchmarks, runs, description
-//      FROM ". Database::SESSION_TABLE ."
-//      ORDER BY id DESC";
-//$sessions = Database::GetConnection()->query($q) or die("Query error: $q");
+$q = "SELECT session AS id, COUNT(test) AS tests, perf_rate AS rate
+      FROM ". Database::TEST_TABLE ."
+      GROUP BY session
+      ORDER BY session DESC";
+$st = Database::GetConnection()->prepare($q);
+if (!$st->execute())
+    throw new ErrorException("Error executing query: $q");
+if($st->rowCount() < 1)
+    echo '<p>No session present in the database</p>';
+else
+{
+    $st->bindColumn('id', $sessionId, PDO::PARAM_INT);
+    $st->bindColumn('tests', $sessionTestsCount, PDO::PARAM_INT);
+    $st->bindColumn('rate', $sessionConnectionsRate, PDO::PARAM_INT);
+    echo '
+    <form method="get">
+        <select id="sessionSelect" name="session" size="6" class="sessions" onchange="this.form.submit()">
+            <option disabled="disabled">'.
+            str_replace(" ", "&nbsp;", sprintf("%-16s%-18s%-10s%-10s", "ID", "DATE", "TESTS", "CONNECTIONS RATE")).
+            '</option>';
 
-//if ($sessions->rowCount() < 1)
-//    echo '<p>No session present in the database</p>';
-//else
-//{
-//    echo '
-//    <form method="get">
-//        <select id="sessionSelect" name="bench" size="6" class="sessions" onchange="this.form.submit()">
-//            <option disabled="disabled">'.
-//            str_replace(" ", "&nbsp;", sprintf("%-16s%-15s%-31s%-52s%-30s", "ID", "DATE", "RUNS", "BENCHMARKS", "DESCRIPTION")).
-//            '</option>';
-//
-//    while($s = $sessions->fetch())
-//    {
-//        $id = str_replace(" ", "&nbsp;", sprintf("%-13s", $s['id']));
-//        $date = str_replace(" ", "&nbsp;", sprintf("%-22s", date("Y-m-d H:i:s", $s['id'])));
-//        $runs = str_replace(" ", "&nbsp;", sprintf("%-7s", $s['runs']));
-//        $benchmarks = str_replace(" ", "&nbsp;", sprintf("%-60s", $s['benchmarks']));
-//        $description = str_replace(" ", "&nbsp;", sprintf("%-50s", ($s['description'] == null ? "" : $s['description'])));
-//
-//        echo '<option value="'. $s['id'] .
-//                ( !empty($_GET['bench']) && $_GET['bench'] == $s['id'] ? '" selected="selected">' : '">' ).
-//                $id.$date.$runs.$benchmarks.$description.'</option>';
-//    }
-//
-//    echo '
-//        </select>
-//        <!-- <input type="submit" value="Show benchmark" /> -->
-//    </form>';
-//}
+    while ($st->fetch(PDO::FETCH_BOUND))
+    {
+        $id = str_replace(" ", "&nbsp;", sprintf("%-13s", $sessionId));
+        $date = str_replace(" ", "&nbsp;", sprintf("%-27s", date("Y-m-d H:i:s", $sessionId)));
+        $tests = str_replace(" ", "&nbsp;", sprintf("%-15s", $sessionTestsCount));
+        $connRate = str_replace(" ", "&nbsp;", sprintf("%-14s", $sessionConnectionsRate));
+
+        echo '<option value="'. $sessionId .
+                ( !empty($_GET['session']) && $_GET['session'] == $sessionId ? '" selected="selected">' : '">' ).
+                $id.$date.$tests.$connRate.'</option>';
+    }
+
+    echo '
+        </select>
+        <!-- <input type="submit" value="Show benchmark" /> -->
+    </form>';
+ }
 
 // Show benchmark if requested
 if (!empty($_GET['session']))
@@ -94,8 +98,8 @@ if (!empty($_GET['session']))
     { die("<p>Session $id doesn't exist</p>"); }
 
     $cpuUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "fpm"), "GetVhosts");
-    $memoryUsage = $s->PlotRelativeResourceUsage("GetMemoryUsage", array("GetConfiguration" => "fpm"), "GetVhosts");
-    $raw = $s->GetData("GetMemoryUsage", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
+    $memoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
+    $raw = $s->GetData("GetMemoryUsageMiB", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
 
     // Get verbose output produced
     $verbose = ob_get_clean();

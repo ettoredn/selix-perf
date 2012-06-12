@@ -118,4 +118,13 @@ class Test
         return $values;
     }
 
+    public function GetMemoryUsageMiB()
+    {
+        $values = $this->GetActivity(array("GetMemoryUsedKiB", null));
+        foreach ($values as $key => $value)
+            $values[$key] = bcdiv( $value, "1024", 0);
+
+        return $values;
+    }
+
 }
