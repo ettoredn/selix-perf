@@ -80,16 +80,19 @@ then
 fi
 
 #### System
+echo -e "\nSetting maximum number of open file descriptors to unlimited ..."
 echo "
 *               soft    nofile          999999
 *               hard    nofile          999999
 root            soft    nofile          999999
 root            hard    nofile          999999
 " > /etc/security/limits.d/nofile
+echo -e "\nSetting vm.oom_kill_allocating_task=1 ..."
 sysctl -w vm.oom_kill_allocating_task=1 || quit 1
 #sysctl -w vm.drop_caches=3 || quit 1
 echo "vm.oom_kill_allocating_task = 1" > /etc/sysctl.d/oom_kill.conf
 #echo "vm.drop_caches = 3" > /etc/sysctl.d/drop_caches.conf
+echo -e "\nDisabling swap ..."
 swapoff -a || quit 1
 
 #### LTTng
@@ -115,6 +118,7 @@ cd ~/php
 mkdir -p /etc/php/conf.d
 if [[ $BUILD_PHP != "" ]]
 then
+	echo -e "\nBuilding PHP ..."
 	# export LIBS="-llttng-ust -lrt -ldl"
 	./buildconf
 	./configure --prefix=/usr --enable-debug --enable-fpm --enable-cli --with-apxs2=/usr/bin/apxs2 --disable-cgi \
@@ -134,6 +138,7 @@ then
 	make && make install
 	# export LIBS=""
 fi
+echo -e "\nConfiguring PHP ..."
 mkdir -p /etc/php/conf.d
 mkdir -p /etc/php/fpm-pool.d
 touch /etc/php/php.ini
@@ -298,22 +303,26 @@ then
 fi
 
 #### APACHE
+echo -e "\nSetting Apache listen port to 81 ..."
 echo '
 NameVirtualHost *:81
 Listen 81
 ' > /etc/apache2/ports.conf
 
 #### NGINX
+echo -e "\nSetting up nxing ..."
 rm -f /etc/nginx/sites-enabled/default
 
 #### WEBROOT
 if [[ $( mount | egrep webroot ) == "" ]]
 then
+	echo -e "\nRebinding webroot to /dev/shm/webroot ..."
 	rm -rf ~/webroot
 	rm -rf /dev/shm/webroot
 	mkdir ~/webroot || quit 1
 	mkdir /dev/shm/webroot || quit 1
 	touch ~/webroot/this.is.the.old.one
 	mount --bind /dev/shm/webroot ~/webroot || quit 1
-	cp -R ./app_wordpress/ ~/webroot/wordpress
+	echo -e "\nCopying Wordpress into webroot ..."
+	cp -R "$cwd/app_wordpress" ~/webroot/wordpress
 fi
