@@ -93,13 +93,15 @@ if (!empty($_GET['session']))
     } catch (ErrorException $e)
     { die("<p>Session $id doesn't exist</p>"); }
 
-    $cpuUsage = $s->PlotRelativeResourceUsage( "GetCPUUsage", array("GetConfiguration" => "fpm"), "GetVhosts" );
-    $raw = $s->GetData("GetCPUUsage", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
+    $cpuUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "fpm"), "GetVhosts");
+    $memoryUsage = $s->PlotRelativeResourceUsage("GetMemoryUsage", array("GetConfiguration" => "fpm"), "GetVhosts");
+    $raw = $s->GetData("GetMemoryUsage", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
 
     // Get verbose output produced
     $verbose = ob_get_clean();
 
     echo "<img src='$cpuUsage' width='731' height='549'/>";
+    echo "<img src='$memoryUsage' width='731' height='549'/>";
 
     echo '<p><a href="javascript:void(0)" onclick="switchRawData();">Show/hide raw data</a></p>';
     echo "<pre id='rawData' style='display: none;'>".print_r($raw, true)."</pre>";

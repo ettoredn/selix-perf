@@ -102,7 +102,9 @@ class Session
         $filterByValue = array_values($filterBy)[0];
 
         $filename = $this->GetId()."_".$resourceProperty."_".$filterByProperty."_".$filterByValue."_".$groupByProperty.".png";
-        $title = "CPU usage with $filterByProperty = $filterByValue";
+        $cleanResource = preg_replace('/Usage$/', '',preg_replace('/^Get/', '', $resourceProperty));
+        $cleanFilter = strtolower(preg_replace('/^Get/', '', $filterByProperty));
+        $title = $cleanResource ." usage with $cleanFilter = $filterByValue";
 
         // If already generated returns it
         if (file_exists(Gnuplot::DATAPATH.$filename) && !$GLOBALS['disable_cache'])
@@ -120,7 +122,7 @@ class Session
         foreach ($data as $groupedValue => $values)
         {
             // Header
-            $plotData[$column][] = "$groupByProperty = $groupedValue";
+            $plotData[$column][] = "\"$groupByProperty = $groupedValue\"";
 
             foreach ($values as $sa)
                 $plotData[$column][] = $sa;
