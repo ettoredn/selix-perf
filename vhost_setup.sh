@@ -2,6 +2,7 @@
 VHOSTS=10
 FPM_CHILDREN=5
 FPM_REQUESTS=0
+ENABLE_SELIX=0
 APPEND_HOSTNAME=".selixperf.dev"
 TEMPLATE_FPM='[{NAME}]
 listen = /var/run/php-fpm/{SOCK_NAME}.sock
@@ -39,7 +40,7 @@ server {
 '
 
 function usage {
-	echo "Usage: $0 [--vhosts n] [--children n] [--requests n]"
+	echo "Usage: $0 [--vhosts n] [--children n] [--requests n] [--enable-selix]"
 	quit 1
 }
 
@@ -56,29 +57,30 @@ cwd=$( dirname "$abspath" )
 ecwd=$( echo $cwd | sed 's/\//\\\//g' )
 
 # Evaluate options
-newopts=$( getopt -n"$0" --longoptions "vhosts:,children:,requests:,help" "h" "$@" ) || usage
+newopts=$( getopt -n"$0" --longoptions "vhosts:,children:,requests:,enable-selix,help" "h" "$@" ) || usage
 set -- $newopts
 while (( $# >= 0 ))
 do
 	case "$1" in
-		--vhosts)	VHOSTS=$( echo $2 | sed "s/'//g" )
-					if (( VHOSTS < 1 ))
-					then
-						echo "*** vhosts argument must be > 0" >&2 && quit 1
-					fi
-					shift;shift;;
-		--children)	FPM_CHILDREN=$( echo $2 | sed "s/'//g" )
-					if (( FPM_CHILDREN < 1 ))
-					then
-						echo "*** children argument must be > 0" >&2 && quit 1
-					fi
-					shift;shift;;
-		--requests)	FPM_REQUESTS=$( echo $2 | sed "s/'//g" )
-					if (( FPM_REQUESTS < 0 ))
-					then
-						echo "*** requests argument must be > -1" >&2 && quit 1
-					fi
-					shift;shift;;
+		--vhosts)		VHOSTS=$( echo $2 | sed "s/'//g" )
+						if (( VHOSTS < 1 ))
+						then
+							echo "*** vhosts argument must be > 0" >&2 && quit 1
+						fi
+						shift;shift;;
+		--children)		FPM_CHILDREN=$( echo $2 | sed "s/'//g" )
+						if (( FPM_CHILDREN < 1 ))
+						then
+							echo "*** children argument must be > 0" >&2 && quit 1
+						fi
+						shift;shift;;
+		--requests)		FPM_REQUESTS=$( echo $2 | sed "s/'//g" )
+						if (( FPM_REQUESTS < 0 ))
+						then
+							echo "*** requests argument must be > -1" >&2 && quit 1
+						fi
+						shift;shift;;
+		--enable-selix) ENABLE_SELIX=1;shift;;
 		--help | -h) usage;;
 		--) shift;break;;
 	esac
@@ -94,6 +96,21 @@ cd "$cwd"
 if [[ $( whoami ) != "root" ]]
 then
 	echo "*** This script must be run as root" >&2 && quit 1
+fi
+
+if [[ $ENABLE_SELIX == 1 ]]
+then
+	$( selinuxenabled )
+	if (( $? != 0 ))
+	then
+		echo "*** You cannot load selix extension if SELinux is not enabled on the system." >&2 && quit 1
+	fi
+	# Force vhost number to 1
+	VHOSTS=1	
+	echo "zend_extension=/usr/lib/php/20100525-debug/selix.so
+	auto_globals_jit = Off" > /etc/php/conf.d/selix.ini || quit 1
+else
+	rm "/etc/php/conf.d/selix.ini" &>/dev/null
 fi
 
 # Remove all active pools
@@ -135,7 +152,7 @@ echo -n "
 server {
         listen   80;
         server_name selixperf.dev;
-        root "/root/webroot";
+        root \"/root/webroot\";
 
         location / {
                 autoindex on;
