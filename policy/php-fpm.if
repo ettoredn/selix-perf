@@ -1,0 +1,88 @@
+## <summary>PHP-FPM policy</summary>
+########################################
+## <summary>
+##	Allow a domain to perform as a PHP process with minimum privileges.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+# args: vhost_execute_php_t - vhost_compile_php_t - php_vhost_script_t - httpd_vhost_content_t - php_vhost_tmp_t
+interface(`php_webapp',`
+	gen_require(`
+		attribute php_domains;
+		type php_t, php_config_t, php_log_t;
+		type $1, $2, $3, $4, $5;
+		role system_r;
+	')
+
+	typeattribute $1 php_domains;
+	typeattribute $2 php_domains;
+	typebounds php_t $1; # php => execute
+	typebounds $1 $2; # execute => compile
+	domain_dyntrans_type( $1 ) # execute => compile
+	role system_r types { $1 $2 };
+	
+	# Process and capabilities
+	allow php_t { $1 $2 }:process { dyntransition }; # php => execute/compile
+	allow { $1 $2 } php_t:fd use;
+	allow php_t { $1 $2 }:fd use;
+	allow $1 self:process { setcurrent dyntransition }; # execute => compile
+	allow { $1 } $2:process { dyntransition }; # execute => compile
+	
+	# Kernel
+	dev_read_urand( { $1 $2 } )
+	dev_write_urand( { $1 $2 } )
+	kernel_read_system_state( { $1 $2 } )
+	# denied  { dir:search } name="20694" dev=proc sephp_php_t:s0 => php_t:s0
+	allow { $1 $2 } php_t:dir search;
+	
+	# Network
+	allow { $1 $2 } php_t:stream_socket_class_set { rw_socket_perms }; # FPM
+	allow php_t { $1 $2 }:stream_socket_class_set { rw_socket_perms }; # FPM
+	allow { $1 $2 } php_t:dgram_socket_class_set { rw_socket_perms }; # FPM
+	# DNS
+	sysnet_dns_name_resolve( { php_t $1 } ) # PERMISSIVE
+	corenet_tcp_connect_http_port( { php_t $1 } ) # PERMISSIVE
+
+	# Log files
+	allow { $1 $2 } php_log_t:file { append_file_perms };
+	logging_send_syslog_msg( { $1 $2 } )
+	logging_search_logs( { $1 $2 } )
+	
+	# Temp files
+	files_tmp_file( $5 )
+	files_tmp_filetrans( { $1 $2 }, $5, file )
+	allow { php_t $1 } $5:file { manage_file_perms };
+		
+	# System / misc files
+	miscfiles_read_fonts( php_t )
+	miscfiles_read_certs( php_t )
+	miscfiles_read_localization( { $1 $2 } )
+	files_read_etc_files( { $1 $2 } ) # PERMISSIVE
+	
+	# Search home directories (ASSUMING VHOSTS IN /home)
+	userdom_search_user_home_content( { php_t $1 $2 } )
+	
+	# Read php_vhost_script_t files and links
+	read_files_pattern( { php_t $1 $2 }, $4, $3 )
+	read_lnk_files_pattern( { php_t $1 $2 }, $4, $3 )
+	
+	# Read httpd_vhost_content_t files and links
+	read_files_pattern( { php_t $1 }, $4, $4 ) # PERMISSIVE
+	read_lnk_files_pattern( { php_t $1 $2 }, $4, $4 )
+	
+	# Manage httpd_vhost_content_t files
+	# allow { php_t $1 } $4:dir rw_dir_perms; # PERMISSIVE
+	# allow { php_t $1 } $4:file manage_file_perms; # PERMISSIVE
+	
+	# List httpd_vhost_content_t dirs
+	allow { php_t $1 } $4:dir list_dir_perms; # PERMISSIVE
+	
+	# Create httpd_vhost_content_t
+	# create_dirs_pattern( { php_t $1 }, $4, $4 ) # PERMISSIVE
+
+	# MySQL
+	mysql_stream_connect( { php_t $1 } )
+')

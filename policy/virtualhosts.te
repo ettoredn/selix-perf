@@ -1,0 +1,38 @@
+policy_module( virtualhosts, 0.1 )
+
+#######################
+# sephp virtualhost
+#######################
+
+# httpd domain
+type sephp_httpd_t;
+domain_type( sephp_httpd_t )
+
+# public files type
+type httpd_sephp_content_t;
+files_type( httpd_sephp_content_t )
+
+# .htaccess type
+type httpd_sephp_htaccess_t;
+files_type( httpd_sephp_htaccess_t )
+
+# php compile type
+type sephp_compile_php_t;
+domain_type( sephp_compile_php_t )
+
+# php execute type
+type sephp_php_t;
+domain_type( sephp_php_t )
+
+# php scripts type
+type php_sephp_script_t;
+files_type( php_sephp_script_t )
+
+# php tmp files type
+type php_sephp_tmp_t;
+files_type( php_sephp_script_t )
+
+
+php_webapp( sephp_php_t, sephp_compile_php_t, php_sephp_script_t, httpd_sephp_content_t, php_sephp_tmp_t )
+apache_base_webapp( sephp_httpd_t )
+apache_user_webapp( sephp_httpd_t, httpd_sephp_content_t, httpd_sephp_htaccess_t, php_sephp_script_t )

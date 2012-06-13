@@ -1,0 +1,96 @@
+policy_module( php-fpm, 0.1 )
+
+#############################
+# Declarations
+#############################
+attribute php_domains;
+
+type php_t;
+role system_r types php_t;
+domain_dyntrans_type( php_t ) # adds process fork
+
+type php_exec_t;
+application_domain( php_t, php_exec_t )
+init_daemon_domain( php_t, php_exec_t )
+# init_ranged_daemon_domain( php_t, php_exec_t, s0 - s15:c0.c1023 ) # MLS
+
+type php_config_t;
+files_type( php_config_t )
+
+type php_log_t;
+logging_log_file( php_log_t ) # files_type()
+
+type php_tmp_t;
+files_tmp_file( php_tmp_t ) # files_type()
+
+type php_pid_t;
+files_pid_file( php_pid_t ) # files_type()
+
+type php_modules_t;
+files_type( php_modules_t )
+type php_modules_dir_t;
+files_type( php_modules_dir_t )
+
+#############################
+# Local policies
+#############################
+typeattribute php_t php_domains;
+
+# Process and capabilities
+allow php_t self:process { setcurrent dyntransition signal sigkill };
+allow php_t self:capability { kill setuid setgid };
+allow php_t self:fd use;
+allow php_t self:fifo_file rw_fifo_file_perms;
+
+# Kernel
+kernel_read_kernel_sysctls( php_t )
+dev_read_urand( php_t )
+dev_write_urand( php_t )
+kernel_read_system_state( php_t )
+
+# Networking
+corenet_tcp_bind_all_nodes( php_t ) # FPM
+corenet_tcp_bind_all_unreserved_ports( php_t ) # FPM
+allow php_t self:stream_socket_class_set { create_stream_socket_perms }; # FPM
+allow php_t self:dgram_socket_class_set { create_socket_perms }; # FPM
+
+# PHP config files
+getattr_files_pattern( php_t, php_config_t, php_config_t )
+read_files_pattern( php_t, php_config_t, php_config_t )
+read_lnk_files_pattern( php_t, php_config_t, php_config_t )
+list_dirs_pattern( php_t, php_config_t, php_config_t )
+
+# Log files
+logging_log_filetrans( php_t, php_log_t, file )
+allow php_t php_log_t:file { create_file_perms append_file_perms };
+logging_send_syslog_msg( php_t )
+logging_search_logs( php_t )
+
+# Temp files
+files_tmp_filetrans( php_t, php_tmp_t, file )
+allow php_t php_tmp_t:file { manage_file_perms };
+
+# pid file
+files_pid_filetrans(php_t, php_pid_t, file )
+allow php_t php_pid_t:file { manage_file_perms };
+
+# Dynamic Loadable Libraries
+mmap_files_pattern( php_t , php_modules_dir_t, php_modules_t )
+
+# System / Misc files
+# miscfiles_read_fonts( php_t )
+# miscfiles_read_certs( php_t )
+miscfiles_read_localization( php_t )
+files_read_etc_files( php_t ) # PERMISSIVE
+
+# Don't audit bin_t search
+corecmd_dontaudit_search_bin( php_t )
+
+
+#############################
+# Development/testing stuff
+#############################
+# execution of selix.so
+userdom_dontaudit_exec_user_home_content_files( php_t )
+
+

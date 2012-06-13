@@ -1,0 +1,100 @@
+## <summary>Apache/SELinux plus</summary>
+
+########################################
+## <summary>
+##	Allow a domain to perform as a web server process
+##	with necessary minimum privileges.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+# vhost_httpd_t
+interface(`apache_base_webapp',`
+	gen_require(`
+		attribute httpd_server_domains;
+		type httpd_t;
+		# type httpd_config_t;
+		type httpd_log_t;
+		type $1;
+	')
+
+	typeattribute $1 httpd_server_domains;
+	typebounds httpd_t $1;
+	role system_r types $1;
+
+	# Process
+	allow httpd_t $1:process { dyntransition };
+	allow $1 httpd_t:fd use;
+	
+	# Network
+	# no connect, listen or bind
+	allow $1 httpd_t:stream_socket_class_set { rw_socket_perms };
+	allow $1 self:stream_socket_class_set { create_socket_perms }; # FPM
+	corenet_tcp_connect_all_unreserved_ports($1) # FPM
+	
+	# device nodes
+	dev_read_sysfs($1)
+	dev_read_rand($1)
+	dev_read_urand($1)
+	dev_rw_crypto($1)
+	
+	# Log
+	logging_search_logs($1)
+	logging_send_syslog_msg($1)
+	# apache_append_log( $1 ) adds read too, NOT NEEDED!
+	append_files_pattern($1, httpd_log_t, httpd_log_t)
+	
+	# Misc files
+	miscfiles_read_localization($1)
+	miscfiles_read_fonts($1)
+	miscfiles_read_certs($1)
+	
+	# Search sys content
+	apache_search_sys_content($1)
+	
+	# Read blank.gif
+	files_read_usr_files($1)
+')
+
+########################################
+## <summary>
+##	Allos a domain to access UBAC types for web contents
+## </summary>
+## <param name="prefix">
+##	<summary>
+##	The prefix to be used for deriving type names.
+##	</summary>
+## </param>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+# vhost_httpd_t - httpd_vhost_content_t - httpd_vhost_htaccess_t - php_vhost_script_t
+interface(`apache_user_webapp',`
+	gen_require(`
+		type httpd_t;
+		type $1, $2, $3, $4;
+	')
+	
+	# Search home directories (ASSUMING VHOSTS IN /home)
+	userdom_search_user_home_content( $1 )
+
+	# httpd_vhost_htaccess_t files
+	allow { httpd_t $1 } $3:file read_file_perms;
+
+	# Read httpd_vhost_content_t files and links
+	read_files_pattern( { httpd_t $1 }, $2, $2 )
+	read_lnk_files_pattern( { httpd_t $1 }, $2, $2 )
+	
+	# List httpd_vhost_content_t dirs (needed only by autoindex?)
+	list_dirs_pattern( { httpd_t $1 }, $2, $2 )
+	
+	# getattr php_vhost_script_t files and read links 
+	# (needed by file existence check)
+	getattr_files_pattern( { httpd_t $1 }, $2, $4 )
+	read_lnk_files_pattern( { httpd_t $1 }, $2, $4 )
+		
+')

@@ -111,7 +111,6 @@ if (!empty($_GET['session']))
     echo "<pre id='rawData' style='display: none;'>".print_r($raw, true)."</pre>";
     echo '<p><a href="javascript:void(0)" onclick="switchLog();">Show/hide log</a></p>';
     echo "<pre id='log' style='display: none;'>".$verbose."</pre>";
-
 }
 ?>
  </body>

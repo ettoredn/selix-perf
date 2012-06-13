@@ -7,3 +7,5 @@
 
 # Project
 performance_viewer/data/
+policy/*.pp
+policy/tmp/

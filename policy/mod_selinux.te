@@ -1,0 +1,31 @@
+policy_module(mod_selinux, 0.1)
+
+#############################
+# Declarations
+#############################
+attribute httpd_server_domains;
+
+#############################
+# Local policies
+#############################
+gen_require(`
+	type httpd_t;
+	type httpd_exec_t;
+')
+
+typeattribute httpd_t httpd_server_domains;
+
+# Allow httpd_t set its context
+domain_dyntrans_type( httpd_t )
+
+allow httpd_t self:process { setcurrent };
+ 
+# ifdef(`enable_mcs',`
+# 	init_ranged_daemon_domain(httpd_t,httpd_exec_t,s0 - mcs_systemhigh)
+# ')
+
+#############################
+### fixes for Apache policy
+#############################
+userdom_search_user_home_content( httpd_t ) # (ASSUMING VHOSTS IN /home)
+corenet_tcp_connect_all_unreserved_ports( httpd_t ) # FPM

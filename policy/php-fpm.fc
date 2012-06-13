@@ -1,0 +1,10 @@
+/usr/sbin/php(5)?-fpm		--	gen_context(system_u:object_r:php_exec_t,s0)
+/usr/lib(64)?/php(5)?		-d	gen_context(system_u:object_r:php_modules_dir_t,s0)
+/usr/lib(64)?/php(5)?/.+		-d	gen_context(system_u:object_r:php_modules_dir_t,s0)
+/usr/lib(64)?/php(5)?/.+/.*\.so?	gen_context(system_u:object_r:php_modules_t,s0)
+/etc/php(5)?(/.*)?			gen_context(system_u:object_r:php_config_t,s0)
+/var/log/php(5)?-fpm.log --      gen_context(system_u:object_r:php_log_t,s0)
+/var/run/php(5)?-fpm.pid --      gen_context(system_u:object_r:php_pid_t,s0)
+
+#### used for testing purpose ####
+/usr/bin/php(5)?			--	gen_context(system_u:object_r:php_exec_t,s0)
