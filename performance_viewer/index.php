@@ -97,15 +97,32 @@ if (!empty($_GET['session']))
     } catch (ErrorException $e)
     { die("<p>Session $id doesn't exist</p>"); }
 
-    $cpuUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "fpm"), "GetVhosts");
-    $memoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
-    $raw = $s->GetData("GetMemoryUsageMiB", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
+    if ($s->ConfigurationExists("fpm"))
+    {
+        $cpuUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "fpm"), "GetVhosts");
+        $memoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
+    }
+    if ($s->ConfigurationExists("selix"))
+    {
+        $selixCPUUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "selix"), "GetChildren");
+        $selixMemoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "selix"), "GetChildren");
+    }
+
+//    $raw = $s->GetData("GetMemoryUsageMiB", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
 
     // Get verbose output produced
     $verbose = ob_get_clean();
 
-    echo "<img src='$cpuUsage' width='731' height='549'/>";
-    echo "<img src='$memoryUsage' width='731' height='549'/>";
+    if ($s->ConfigurationExists("fpm"))
+    {
+        echo "<img src='$cpuUsage' width='731' height='549'/>";
+        echo "<img src='$memoryUsage' width='731' height='549'/>";
+    }
+    if ($s->ConfigurationExists("selix"))
+    {
+        echo "<img src='$selixCPUUsage' width='731' height='549'/>";
+        echo "<img src='$selixMemoryUsage' width='731' height='549'/>";
+    }
 
     echo '<p><a href="javascript:void(0)" onclick="switchRawData();">Show/hide raw data</a></p>';
     echo "<pre id='rawData' style='display: none;'>".print_r($raw, true)."</pre>";

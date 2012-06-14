@@ -9,6 +9,7 @@ FPM_REQUESTS=""
 PERF_URI="/wordpress/"
 PERF_CONN="500"
 PERF_RATE="3"
+ENABLE_SELIX=0
 SQL_TMP_PATH="/dev/shm"
 DB_USER="root"
 DB_PASS="ettore"
@@ -17,7 +18,7 @@ DB_TABLE_SA="system_activity"
 DB_TABLE_TEST="test"
 
 function usage {
-	echo "Usage: $0 [--use-last-session] [--conf <name>] [--server <hostname>] [--vhosts n] [--children n] [--requests n] [--uri </path/>] [--conn n] [--rate n]"
+	echo "Usage: $0 [--use-last-session] [--conf <name>]  [--enable-selix] [--vhosts n] [--children n] [--requests n] [--server <hostname>] [--uri </path/>] [--conn n] [--rate n]"
 	quit 0
 }
 
@@ -46,7 +47,7 @@ perf_session=$( date +%s )
 perf_test=$( date +%s )
 
 # Evaluate options
-newopts=$( getopt -n"$0" --longoptions "use-last-session,conf:,server:,vhosts:,children:,requests:,uri:,conn:,rate:,help" "h" "$@" ) || usage
+newopts=$( getopt -n"$0" --longoptions "use-last-session,conf:,server:,vhosts:,children:,requests:,uri:,conn:,rate:,enable-selix,help" "h" "$@" ) || usage
 set -- $newopts
 while (( $# >= 0 ))
 do
@@ -109,6 +110,7 @@ do
 						echo "*** rate argument must be > 1" >&2 && quit 1
 					fi
 					shift;shift;;
+		--enable-selix) ENABLE_SELIX=1;shift;;
 		--help | -h) usage;;
 		--) shift;break;;
 	esac
@@ -138,9 +140,13 @@ if [[ $FPM_REQUESTS != "" ]]
 then
 	FPM_REQUESTS="--requests=$FPM_REQUESTS"
 fi
+if [[ $ENABLE_SELIX == 1 ]]
+then
+	ENABLE_SELIX="--enable-selix"
+fi
 
 echo -ne "Executing vhosts setup script on remote host $SERVER ...\n\t"
-vhost_info=$( ssh "$SERVER_USER@$SERVER_HOST" "$SETUP_SCRIPT $VHOSTS $FPM_CHILDREN $FPM_REQUESTS" | head -1)
+vhost_info=$( ssh "$SERVER_USER@$SERVER_HOST" "$SETUP_SCRIPT $ENABLE_SELIX $VHOSTS $FPM_CHILDREN $FPM_REQUESTS" | head -1)
 if [[ $? != 0 ]]
 then
 	echo "*** Error executing vhosts setup script" >&2 && quit 1

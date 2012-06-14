@@ -39,6 +39,18 @@ class Session
     protected function GetTests()
     { return $this->test; }
 
+    public function ConfigurationExists( $conf )
+    {
+        if (empty($conf))
+            throw new ErrorException('empty($conf)');
+
+        foreach ($this->test as $test)
+            if ($test->GetConfiguration() == $conf)
+                return true;
+
+        return false;
+    }
+
     /**
      * @param string $property
      * @param array $filter array( methodName => array( methodArgs, filterValue ) )
