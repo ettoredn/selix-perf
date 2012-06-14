@@ -6,9 +6,9 @@ CONFIG=""
 VHOSTS=""
 FPM_CHILDREN=""
 FPM_REQUESTS=""
-PERF_URI="/wordpress/"
+PERF_URI="/phpsqlitecms/"
 PERF_CONN="500"
-PERF_RATE="3"
+PERF_RATE="4"
 ENABLE_SELIX=0
 SQL_TMP_PATH="/dev/shm"
 DB_USER="root"
@@ -159,10 +159,10 @@ VHOSTS="${tokens[0]}"
 FPM_CHILDREN="${tokens[1]}"
 FPM_REQUESTS="${tokens[2]}"
 
-if (( PERF_RATE > FPM_CHILDREN ))
-then
-	echo "*** Connection rate ($PERF_RATE) must be <= than children ($FPM_CHILDREN)" >&2 && quit 1
-fi
+# if (( PERF_RATE > FPM_CHILDREN ))
+# then
+# 	echo "*** Connection rate ($PERF_RATE) must be <= than children ($FPM_CHILDREN)" >&2 && quit 1
+# fi
 echo -ne "\nExecuting sysstat on remote host ...\n\t"
 ssh "$SERVER_USER@$SERVER_HOST" "rm perf.sa"
 ssh "$SERVER_USER@$SERVER_HOST" "sar 1 -o perf.sa &>/dev/null &" || quit 1
