@@ -134,7 +134,7 @@ then
 		--enable-shmop --enable-sockets --enable-simplexml --enable-dom --enable-wddx \
 		--with-libxml-dir=/usr --enable-tokenizer --with-zlib --with-kerberos=/usr --with-openssl=/usr \
 		--enable-soap --enable-zip --with-mhash=yes --without-mm --without-sybase-ct --without-mssql \
-		--with-curl --with-gd --with-mcrypt --without-pear || quit 1
+		--with-curl --with-gd --with-mcrypt --without-pear --disable-zip || quit 1
 	make && make install
 	# export LIBS=""
 fi
