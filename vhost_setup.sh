@@ -141,7 +141,7 @@ server {
                 index index.php;
         }
 
-        location ~ ^/wordpress/.+\.php$ {
+        location ~ ^/phpsqlitecms/.+\.php$ {
                 fastcgi_pass fpms;
                 include fastcgi_params;
 				fastcgi_param SELINUX_DOMAIN			\"sephp_php_t\";

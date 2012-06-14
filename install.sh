@@ -323,8 +323,8 @@ then
 	mkdir /dev/shm/webroot || quit 1
 	touch ~/webroot/this.is.the.old.one
 	mount --bind /dev/shm/webroot ~/webroot || quit 1
-	echo -e "\nCopying Wordpress into webroot ..."
-	cp -R "$cwd/app_wordpress" ~/webroot/wordpress
+	echo -e "\nCopying phpSQLiteCMS into webroot ..."
+	cp -R "$cwd/app_phpsqlitecms" ~/webroot/phpsqlitecms
 fi
 
 # SELinux policy
@@ -367,7 +367,7 @@ then
 	
 	# Relabel webroot
 	echo -e "\tRelabeling webroot ..."
-	cd ~/webroot || quit 1	
+	cd ~/webroot || quit 1
 	find -print0 | xargs -0 chcon -t httpd_sephp_content_t
 	find -type f -name "*.php" -print0 | xargs -0 chcon -t php_sephp_script_t
 	find -type f -name ".htaccess" -print0 | xargs -0 chcon -t httpd_sephp_htaccess_t &>/dev/null

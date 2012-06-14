@@ -1,0 +1,119 @@
+phpSQLiteCMS changelog
+----------------------
+
+Version 2.0.4 (2010-03-18)
+--------------------------------
+- minor global content block bug fixed
+- content functions bug fixed
+
+Version 2.0.3 (2010-03-17)
+--------------------------------
+- filemanager improvemets
+- lightbox improvements (browser back button support)
+- French language files added
+
+Version 2.0.2 (2010-07-01)
+--------------------------------
+- Bugfixes, pingbacks implemented, lightbox implemented
+
+Version 2.0.1 (2010-06-17)
+--------------------------------
+- Fixed JavaScript bug in menu administration
+
+Version 2.0 (2010-06-04)
+--------------------------------
+- New page type "Simple news"
+- Flowplayer can be used to play *.flv films now
+- gzip compression for cache files 
+
+Version 2.0 beta 2 (2010-??-??)
+--------------------------------
+- closing comments for commentable pages possible now (enter a value into the
+  page type addition field to close comments, e.g. 'closed')
+- cached pages send a HTTP_IF_MODIFIED_SINCE header now
+
+Version 2.0 beta 1 (2009-09-17)
+--------------------------------
+- minor bugfixs
+
+Version 2.0 alpha 4 (2009-06-22)
+--------------------------------
+- bugfix: http://phpsqlitecms.mylittlehomepage.net/bugtracker/view.php?id=4
+
+Version 2.0 alpha 3 (2009-06-03)
+--------------------------------
+- fixed bug concerning the Akismet spam protection
+- revised comment administration
+
+Version 2.0 alpha 2 (2009-05-31)
+--------------------------------
+- possibility to use TinyMCE as WYSIWYG editor implemented
+- fixed incorrect links in pages with page names containing slashes
+
+Version 2.0 alpha 1 (2009-05-28)
+--------------------------------
+- code completely revised
+- phpSQLiteCMS now uses PDO as database interface
+- Smarty isn't used anymore
+
+Version 1.0 (2008-12-25)
+------------------------
+- photo galleries can display *.swf films now (*.flv with JW FLV Player plugin)
+- edit permissions for users implemented
+- updated Smarty (version 2.6.22)
+
+Version 1 RC2 (2008-04-20)
+--------------------------
+- fixed bug in slideshow: http://phpsqlitecms.net/forum/index.php?id=12
+
+Version 1 RC1 (2008-03-26)
+--------------------------
+- caching feature implemented
+- update to Smarty 2.6.19
+- other minor changes
+
+Beta 0.9 (2007-09)
+------------------
+- UTF-8 support
+- update to Smarty 2.6.18
+
+Beta 0.8 (2007-02)
+------------------
+- modifications of global content blocks, notes and comments
+
+Beta 0.7 (2007-01)
+------------------
+- new page type: newsletter subscription
+- new page type: site search
+
+Beta 0.6 (2006-11)
+------------------
+- Bad Behavior and Akismet spam protection integrated
+- update to Smarty 2.6.16
+
+Beta 0.5
+--------
+- structural changes in the admin area
+- blocking of user agents
+- update to Smarty 2.6.14
+
+Beta 0.4
+--------
+- menus and notes can now be included for each page individually
+
+Beta 0.3
+--------
+- update to Smarty 2.6.10
+- possibility to block IPs
+- image uploader improved (images can be resized and compressed now)
+- some structural changes (changed subdirectories: data for the SQLite
+  files, images for images, files for files like HTML files or
+  download files)
+
+Beta 0.2
+--------
+- new comment management in the admin area
+
+Beta 0.1
+--------
+- first release

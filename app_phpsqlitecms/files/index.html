@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<title>HTML demo page</title>
+<style type="text/css">
+<!--
+body         { color:#000; background:#fff; margin:0; padding:20px; font-family:verdana, arial, sans-serif; font-size:100.1%; }
+h1           { font-size:1.3em; }
+p            { font-size:0.82em; line-height:1.45em; max-width:55em; }
+#jstest      { font-size:0.69em; color:#808080; }
+a:link       { color:#0000cc; text-decoration:none; }
+a:visited    { color:#0000cc; text-decoration:none; }
+a:hover      { color:#0000ff; text-decoration:underline; }
+a:active     { color:#ff0000; text-decoration:none; }
+-->
+</style>
+<script type="text/javascript">/* <![CDATA[ */
+function jstest()
+ {
+  document.getElementById('jstest').innerHTML = 'JavaScript is enabled.';
+ }
+/* ]]> */</script>
+</head>
+
+<body onload="jstest()">
+
+<h1>HTML demo page</h1>
+
+<p><a href="../">Lorem ipsum</a> dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.</p>
+
+<p id="jstest">JavaScript is not enabled.</p>
+
+</body>
+
+</html>
