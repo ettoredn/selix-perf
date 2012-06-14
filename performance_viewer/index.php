@@ -101,6 +101,8 @@ if (!empty($_GET['session']))
     {
         $cpuUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "fpm"), "GetVhosts");
         $memoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
+//        $fpmMemoryBuffers = $s->PlotResourceUsage("GetMemoryBuffersMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
+//        $fpmMemoryCached = $s->PlotResourceUsage("GetMemoryCachedMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
     }
     if ($s->ConfigurationExists("selix"))
     {
@@ -108,7 +110,7 @@ if (!empty($_GET['session']))
         $selixMemoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "selix"), "GetChildren");
     }
 
-//    $raw = $s->GetData("GetMemoryUsageMiB", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
+    $raw = $s->GetData("GetMemoryUsageMiB", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
 
     // Get verbose output produced
     $verbose = ob_get_clean();
@@ -117,6 +119,8 @@ if (!empty($_GET['session']))
     {
         echo "<img src='$cpuUsage' width='731' height='549'/>";
         echo "<img src='$memoryUsage' width='731' height='549'/>";
+//        echo "<img src='$fpmMemoryBuffers' width='731' height='549'/>";
+//        echo "<img src='$fpmMemoryCached' width='731' height='549'/>";
     }
     if ($s->ConfigurationExists("selix"))
     {

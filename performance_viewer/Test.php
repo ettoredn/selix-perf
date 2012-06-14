@@ -122,9 +122,26 @@ class Test
     {
         $values = $this->GetActivity(array("GetMemoryUsedKiB", null));
         foreach ($values as $key => $value)
-            $values[$key] = bcdiv( $value, "1024", 0);
+            $values[$key] = bcdiv( $value, "1024", 3);
 
         return $values;
     }
 
+    public function GetMemoryBuffersMiB()
+    {
+        $values = $this->GetActivity(array("GetMemoryBuffersKiB", null));
+        foreach ($values as $key => $value)
+            $values[$key] = bcdiv( $value, "1024", 3);
+
+        return $values;
+    }
+
+    public function GetMemoryCachedMiB()
+    {
+        $values = $this->GetActivity(array("GetMemoryCachedKiB", null));
+        foreach ($values as $key => $value)
+            $values[$key] = bcdiv( $value, "1024", 3);
+
+        return $values;
+    }
 }

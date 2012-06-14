@@ -10,6 +10,8 @@ class SystemActivity
     private $CPUIdle;
     private $memUsedKiB;
     private $memUsed;
+    private $memBuffersKiB;
+    private $memCachedKiB;
     private $secondsElapsed;
 
     public function __construct( $sa )
@@ -25,6 +27,8 @@ class SystemActivity
         $this->CPUIdle = $sa['cpu_idle'];
         $this->memUsedKiB = $sa['mem_used_kb'];
         $this->memUsed = $sa['mem_used'];
+        $this->memBuffersKiB = $sa['mem_buffers_kb'];
+        $this->memCachedKiB = $sa['mem_cached_kb'];
         $this->secondsElapsed = $sa['seconds_elapsed'];
     }
 
@@ -50,7 +54,16 @@ class SystemActivity
     { return $this->memUsed; }
 
     public function GetMemoryUsedKiB()
-    { return $this->memUsedKiB; }
+    {
+        return $this->memUsedKiB;
+//        return $this->memUsedKiB - $this->memBuffersKiB - $this->memCachedKiB;
+    }
+
+    public function GetMemoryBuffersKiB()
+    { return $this->memBuffersKiB; }
+
+    public function GetMemoryCachedKiB()
+    { return $this->memCachedKiB; }
 
     public function GetSecondsElapsed()
     { return $this->secondsElapsed; }

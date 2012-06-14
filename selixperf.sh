@@ -191,11 +191,12 @@ do
 	cpu_idle="${tokens[9]}"
 	mem_used_kb="${tokens[11]}"
 	mem_used="${tokens[12]}"
+	mem_buffers_kb=""${tokens[13]}""
+	mem_cached_kb=""${tokens[14]}""
 	
 	sql="INSERT INTO $DB_TABLE_SA \
-		(test, seconds_elapsed, cpu_user, cpu_system, cpu_iowait, cpu_idle, mem_used_kb, mem_used) \
-		VALUES( $perf_test, $secs, $cpu_user, $cpu_system, $cpu_iowait, $cpu_idle, $mem_used_kb, \
-		$mem_used );"
+		(test, seconds_elapsed, cpu_user, cpu_system, cpu_iowait, cpu_idle, mem_used_kb, mem_used, mem_buffers_kb, mem_cached_kb) \
+		VALUES( $perf_test, $secs, $cpu_user, $cpu_system, $cpu_iowait, $cpu_idle, $mem_used_kb, $mem_used, $mem_buffers_kb, $mem_cached_kb );"
 	echo $sql >> "$sqltmpfile"
 	
 	echo "($secs) user $cpu_user%, sys $cpu_system%, idle $cpu_idle%, mem $mem_used_kb, mem $mem_used%"
