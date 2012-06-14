@@ -82,7 +82,7 @@ then
 	then
 		echo "*** You cannot load selix extension if SELinux is not enabled on the system." >&2 && quit 1
 	fi
-	echo "zend_extension=/usr/lib/php/20100525-debug/selix.so
+	echo "zend_extension=/usr/lib/php/20100525/selix.so
 	auto_globals_jit = Off" > /etc/php/conf.d/selix.ini || quit 1
 	
 	# Force only 1 vhost with an equivalent number of children
@@ -154,5 +154,8 @@ server {
 ln -s "/etc/nginx/sites-available/selixperf" "/etc/nginx/sites-enabled/selixperf" 2>/dev/null
 # Reload server configuration
 /etc/init.d/nginx reload >/dev/null || quit 1
+
+# Drop caches
+sync && echo 3 >/proc/sys/vm/drop_caches
 
 quit 0

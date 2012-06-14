@@ -88,10 +88,8 @@ root            soft    nofile          999999
 root            hard    nofile          999999
 " > /etc/security/limits.d/nofile
 echo -e "\nSetting vm.oom_kill_allocating_task=1 ..."
-sysctl -w vm.oom_kill_allocating_task=1 &>/dev/null || quit 1
-#sysctl -w vm.drop_caches=3 || quit 1
 echo "vm.oom_kill_allocating_task = 1" > /etc/sysctl.d/oom_kill.conf
-#echo "vm.drop_caches = 3" > /etc/sysctl.d/drop_caches.conf
+sysctl -w vm.oom_kill_allocating_task=1 &>/dev/null || quit 1
 echo -e "\nDisabling swap ..."
 swapoff -a || quit 1
 
@@ -120,8 +118,9 @@ if [[ $BUILD_PHP != "" ]]
 then
 	echo -e "\nBuilding PHP ..."
 	# export LIBS="-llttng-ust -lrt -ldl"
+	make clean &>/dev/null
 	./buildconf
-	./configure --prefix=/usr --enable-debug --enable-fpm --enable-cli --with-apxs2=/usr/bin/apxs2 --disable-cgi \
+	./configure --prefix=/usr --enable-fpm --enable-cli --with-apxs2=/usr/bin/apxs2 --disable-cgi \
 		--with-fpm-user=www-data --with-fpm-group=www-data --with-config-file-path=/etc/php \
 		--with-config-file-scan-dir=/etc/php/conf.d --sysconfdir=/etc --localstatedir=/var \
 		--mandir=/usr/share/man --with-regex=php --disable-rpath --disable-static \
