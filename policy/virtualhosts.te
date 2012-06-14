@@ -30,7 +30,7 @@ files_type( php_sephp_script_t )
 
 # php tmp files type
 type php_sephp_tmp_t;
-files_type( php_sephp_script_t )
+files_type( php_sephp_tmp_t )
 
 
 php_webapp( sephp_php_t, sephp_compile_php_t, php_sephp_script_t, httpd_sephp_content_t, php_sephp_tmp_t )

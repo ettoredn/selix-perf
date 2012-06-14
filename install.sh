@@ -88,7 +88,7 @@ root            soft    nofile          999999
 root            hard    nofile          999999
 " > /etc/security/limits.d/nofile
 echo -e "\nSetting vm.oom_kill_allocating_task=1 ..."
-sysctl -w vm.oom_kill_allocating_task=1 || quit 1
+sysctl -w vm.oom_kill_allocating_task=1 &>/dev/null || quit 1
 #sysctl -w vm.drop_caches=3 || quit 1
 echo "vm.oom_kill_allocating_task = 1" > /etc/sysctl.d/oom_kill.conf
 #echo "vm.drop_caches = 3" > /etc/sysctl.d/drop_caches.conf
@@ -326,3 +326,54 @@ then
 	echo -e "\nCopying Wordpress into webroot ..."
 	cp -R "$cwd/app_wordpress" ~/webroot/wordpress
 fi
+
+# SELinux policy
+$( selinuxenabled )
+if (( $? == 0 ))
+then
+	# SELinux enabled, load apache policy
+	echo -e "\nBuilding policy modules for mod_selinux PHP-FPM and virtualhosts ..."
+	cd "$cwd/policy" || quit 1
+	buildfail=0
+
+	if (( buildfail == 0 )) ; then
+		echo -e "\tExecuting make ..."
+		make clean >/dev/null || buildfail=1
+		make >/dev/null || buildfail=1
+	fi
+
+	if (( buildfail != 0 ))
+	then
+		echo "*** Build of policy modules failed." >&2 && quit 1
+	fi
+	
+	# Remove policy modules (if present)
+	semodule -r virtualhosts &>/dev/null
+	semodule -r php-fpm &>/dev/null
+	semodule -r mod_selinux &>/dev/null
+
+	echo -e "\tLoading mod_selinux policy module ..."
+	semodule -i mod_selinux.pp >/dev/null || quit 1
+	echo -e "\tLoading PHP-FPM policy module ..."
+	semodule -i php-fpm.pp >/dev/null || quit 1
+	echo -e "\tLoading virtualhosts policy module ..."
+	semodule -i virtualhosts.pp >/dev/null || quit 1
+	echo -e "\tRestoring contexts ..."
+	restorecon -r /usr/sbin/php-fpm || quit 1
+	restorecon -r /usr/bin/php || quit 1
+	restorecon -r /usr/lib/php || quit 1
+	restorecon -r /etc/php || quit 1
+	restorecon -r /var/log/php-fpm.log || quit 1
+	
+	# Relabel webroot
+	echo -e "\tRelabeling webroot ..."
+	cd ~/webroot || quit 1	
+	find -print0 | xargs -0 chcon -t httpd_sephp_content_t
+	find -type f -name "*.php" -print0 | xargs -0 chcon -t php_sephp_script_t
+	find -type f -name ".htaccess" -print0 | xargs -0 chcon -t httpd_sephp_htaccess_t &>/dev/null
+	chcon -t httpd_sephp_content_t . || quit 1
+	
+	cd $cwd
+fi
+
+quit 0

@@ -18,26 +18,6 @@ pm.max_requests = {REQUESTS}
 ;pm.min_spare_servers = 5
 ;pm.max_spare_servers = 5
 ;pm.status_path = /status'
-TEMPLATE_NGINX='upstream fpms {
-{SOCKS}
-}
-
-server {
-        listen   80;
-        server_name selixperf.dev;
-        root "/root/webroot";
-
-        location / {
-                autoindex on;
-                index index.php;
-        }
-
-        location ~ ^/wordpress/.+\.php$ {
-                fastcgi_pass fpms;
-                include fastcgi_params;
-        }
-}
-'
 
 function usage {
 	echo "Usage: $0 [--vhosts n] [--children n] [--requests n] [--enable-selix]"
@@ -86,9 +66,6 @@ do
 	esac
 done
 
-echo "$VHOSTS vhosts, $FPM_CHILDREN children, $FPM_REQUESTS requests, \
-$(( $VHOSTS * $FPM_CHILDREN )) processes"
-
 # Change to script directory
 cd "$cwd"
 
@@ -105,15 +82,20 @@ then
 	then
 		echo "*** You cannot load selix extension if SELinux is not enabled on the system." >&2 && quit 1
 	fi
-	# Force vhost number to 1
-	VHOSTS=1	
 	echo "zend_extension=/usr/lib/php/20100525-debug/selix.so
 	auto_globals_jit = Off" > /etc/php/conf.d/selix.ini || quit 1
+	
+	# Force only 1 vhost with an equivalent number of children
+	FPM_CHILDREN=$(( VHOSTS * FPM_CHILDREN ))
+	VHOSTS=1
 else
 	rm "/etc/php/conf.d/selix.ini" &>/dev/null
 fi
 
-# Remove all active pools
+echo "$VHOSTS vhosts, $FPM_CHILDREN children, $FPM_REQUESTS requests, \
+$(( $VHOSTS * $FPM_CHILDREN )) processes"
+
+# Remove all active FPM pools
 rm /etc/php/fpm-pool.d/*.conf
 for (( i=1; i<=$VHOSTS; i++ ))
 do
@@ -162,6 +144,10 @@ server {
         location ~ ^/wordpress/.+\.php$ {
                 fastcgi_pass fpms;
                 include fastcgi_params;
+				fastcgi_param SELINUX_DOMAIN			\"sephp_php_t\";
+				fastcgi_param SELINUX_RANGE				\"s0\";
+				fastcgi_param SELINUX_COMPILE_DOMAIN	\"sephp_compile_php_t\";
+				fastcgi_param SELINUX_COMPILE_RANGE		\"s0\";
         }
 }
 " >> /etc/nginx/sites-available/selixperf

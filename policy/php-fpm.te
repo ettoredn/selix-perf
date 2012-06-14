@@ -44,9 +44,12 @@ allow php_t self:fifo_file rw_fifo_file_perms;
 
 # Kernel
 kernel_read_kernel_sysctls( php_t )
+dev_read_rand( php_t )
+dev_write_rand( php_t )
 dev_read_urand( php_t )
 dev_write_urand( php_t )
 kernel_read_system_state( php_t )
+kernel_read_crypto_sysctls( php_t )
 
 # Networking
 corenet_tcp_bind_all_nodes( php_t ) # FPM
@@ -92,5 +95,6 @@ corecmd_dontaudit_search_bin( php_t )
 #############################
 # execution of selix.so
 userdom_dontaudit_exec_user_home_content_files( php_t )
-
-
+userdom_read_user_tmpfs_files( php_t )
+files_manage_pid_dirs( php_t )
+manage_sock_files_pattern( php_t, var_run_t, var_run_t )
