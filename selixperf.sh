@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-SERVER_USER="root"
-SERVER_HOST="selixperf.dev"
+TARGET_USER="root"
+TARGET_HOST="selixperf.dev"
 SETUP_SCRIPT="~/selixperf/vhost_setup.sh"
 CONFIG=""
 VHOSTS=""
@@ -18,7 +18,7 @@ DB_TABLE_SA="system_activity"
 DB_TABLE_TEST="test"
 
 function usage {
-	echo "Usage: $0 [--use-last-session] [--conf <name>]  [--enable-selix] [--vhosts n] [--children n] [--requests n] [--server <hostname>] [--uri </path/>] [--conn n] [--rate n]"
+	echo "Usage: $0 [--use-last-session] [--conf <fpm|fpmvm|modselinux>] [--enable-selix] [--vhosts n] [--children n] [--requests n] [--server <hostname>] [--uri </path/>] [--conn n] [--rate n]"
 	quit 0
 }
 
@@ -30,7 +30,7 @@ function quit {
 
 function kill_sysstat {
 	echo -e "\nKilling sysstat on remote host ..."
-	ssh "$SERVER_USER@$SERVER_HOST" "kill -SIGTERM $sar_pid"	
+	ssh "$TARGET_USER@$TARGET_HOST" "kill -SIGTERM $sar_pid"	
 }
 
 trap "{
@@ -74,7 +74,7 @@ do
 						perf_session="$last_session"
 					fi
 					shift;;
-		--server)	SERVER_HOST=$( echo $2 | sed "s/'//g" )
+		--server)	TARGET_HOST=$( echo $2 | sed "s/'//g" )
 					shift;shift;;
 		--conf)		CONFIG=$( echo $2 | sed "s/'//g" )
 					shift;shift;;
@@ -111,6 +111,9 @@ do
 					fi
 					shift;shift;;
 		--enable-selix) ENABLE_SELIX=1;shift;;
+		--fpm) 		CONFIG_FPM=1;shift;;
+		--modselinux)	CONFIG_MODSELINUX=1;shift;;
+		--fpmvm)	CONFIG_FPMVM=1;shift;;
 		--help | -h) usage;;
 		--) shift;break;;
 	esac
@@ -120,9 +123,9 @@ if [[ "$last_conn" != "" ]]; then PERF_CONN="$last_conn"; fi
 if [[ "$last_rate" != "" ]]; then PERF_RATE="$last_rate"; fi
 
 # --conf must be defined
-if [[ $CONFIG = "" ]]
+if [[ $CONFIG != "fpm" && $CONFIG != "modselinux" && $CONFIG != "fpmvm" ]]
 then
-	echo "*** configuration name must be defined" >&2 && quit 1
+	echo "*** configuration option must be fpm, modselinux or fpmvm" >&2 && quit 1
 fi
 
 # Check httperf
@@ -146,32 +149,28 @@ then
 fi
 
 echo -ne "Executing vhosts setup script on remote host $SERVER ...\n\t"
-vhost_info=$( ssh "$SERVER_USER@$SERVER_HOST" "$SETUP_SCRIPT $ENABLE_SELIX $VHOSTS $FPM_CHILDREN $FPM_REQUESTS" | head -1)
+vhost_output=$( ssh "$TARGET_USER@$TARGET_HOST" "$SETUP_SCRIPT $ENABLE_SELIX $VHOSTS $FPM_CHILDREN $FPM_REQUESTS --conf=$CONFIG" )
 if [[ $? != 0 ]]
 then
 	echo "*** Error executing vhosts setup script" >&2 && quit 1
 fi
-echo "$vhost_info"
+echo "$vhost_output"
 # Assign real values used by the script
-seded=$( echo "$vhost_info" | sed "s/\([[:digit:]]\+\) vhosts, \([[:digit:]]\+\) children, \([[:digit:]]\+\) requests.*/\1 \2 \3/" )
+seded=$( echo "$vhost_output" | head -1 | sed "s/\([[:digit:]]\+\) vhosts, \([[:digit:]]\+\) children, \([[:digit:]]\+\) requests.*/\1 \2 \3/" )
 tokens=( $seded )
 VHOSTS="${tokens[0]}"
 FPM_CHILDREN="${tokens[1]}"
 FPM_REQUESTS="${tokens[2]}"
 
-# if (( PERF_RATE > FPM_CHILDREN ))
-# then
-# 	echo "*** Connection rate ($PERF_RATE) must be <= than children ($FPM_CHILDREN)" >&2 && quit 1
-# fi
 echo -ne "\nExecuting sysstat on remote host ...\n\t"
-ssh "$SERVER_USER@$SERVER_HOST" "rm perf.sa"
-ssh "$SERVER_USER@$SERVER_HOST" "sar 1 -o perf.sa &>/dev/null &" || quit 1
-sar_pid=$( ssh "$SERVER_USER@$SERVER_HOST" "ps -eF" | egrep 'sar 1 -o perf' | egrep -v 'egrep' | awk '{print $2}' )
+ssh "$TARGET_USER@$TARGET_HOST" "rm perf.sa"
+ssh "$TARGET_USER@$TARGET_HOST" "sar 1 -o perf.sa &>/dev/null &" || quit 1
+sar_pid=$( ssh "$TARGET_USER@$TARGET_HOST" "ps -eF" | egrep 'sar 1 -o perf' | egrep -v 'egrep' | awk '{print $2}' )
 echo "PID: $sar_pid"
 sleep 5
 
 echo -e "\nExecuting httperf, estimated time $(( PERF_CONN / PERF_RATE ))s ..."
-httperf --hog --server="$SERVER_HOST" --uri="$PERF_URI" --num-con="$PERF_CONN" --rate="$PERF_RATE" || quit 1
+httperf --hog --server="$TARGET_HOST" --uri="$PERF_URI" --num-con="$PERF_CONN" --rate="$PERF_RATE" || quit 1
 
 kill_sysstat
 
@@ -200,7 +199,7 @@ do
 	echo $sql >> "$sqltmpfile"
 	
 	echo "($secs) user $cpu_user%, sys $cpu_system%, idle $cpu_idle%, mem $mem_used_kb, mem $mem_used%"
-done <<< "$( ssh "$SERVER_USER@$SERVER_HOST" "sadf -dht -- -ru perf.sa" )"
+done <<< "$( ssh "$TARGET_USER@$TARGET_HOST" "sadf -dht -- -ru perf.sa" )"
 
 echo "INSERT INTO $DB_TABLE_TEST (test, session, configuration, vhosts, children, \
  	  child_requests, perf_connections, perf_rate) \
