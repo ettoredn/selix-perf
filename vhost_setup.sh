@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+CONFIG=""
 VHOSTS=10
 FPM_CHILDREN=5
 FPM_REQUESTS=0
@@ -20,7 +21,7 @@ pm.max_requests = {REQUESTS}
 ;pm.status_path = /status'
 
 function usage {
-	echo "Usage: $0 [--vhosts n] [--children n] [--requests n] [--enable-selix]"
+	echo "Usage: $0 [--vhosts n] [--children n] [--requests n] [--enable-selix] [--conf <fpm|fpmvm|modselinux>]"
 	quit 1
 }
 
@@ -37,7 +38,7 @@ cwd=$( dirname "$abspath" )
 ecwd=$( echo $cwd | sed 's/\//\\\//g' )
 
 # Evaluate options
-newopts=$( getopt -n"$0" --longoptions "vhosts:,children:,requests:,enable-selix,help" "h" "$@" ) || usage
+newopts=$( getopt -n"$0" --longoptions "vhosts:,children:,requests:,conf:,enable-selix,help" "h" "$@" ) || usage
 set -- $newopts
 while (( $# >= 0 ))
 do
@@ -60,6 +61,8 @@ do
 							echo "*** requests argument must be > -1" >&2 && quit 1
 						fi
 						shift;shift;;
+		--conf)			CONFIG=$( echo $2 | sed "s/'//g" )
+						shift;shift;;
 		--enable-selix) ENABLE_SELIX=1;shift;;
 		--help | -h) usage;;
 		--) shift;break;;
@@ -73,6 +76,12 @@ cd "$cwd"
 if [[ $( whoami ) != "root" ]]
 then
 	echo "*** This script must be run as root" >&2 && quit 1
+fi
+
+# --conf must be defined
+if [[ $CONFIG != "fpm" && $CONFIG != "modselinux" && $CONFIG != "fpmvm" ]]
+then
+	echo "*** configuration option must be fpm, modselinux or fpmvm" >&2 && quit 1
 fi
 
 if [[ $ENABLE_SELIX == 1 ]]
@@ -95,36 +104,47 @@ fi
 echo "$VHOSTS vhosts, $FPM_CHILDREN children, $FPM_REQUESTS requests, \
 $(( $VHOSTS * $FPM_CHILDREN )) processes"
 
-# Remove all active FPM pools
-rm /etc/php/fpm-pool.d/*.conf
-for (( i=1; i<=$VHOSTS; i++ ))
-do
-	vhost_name="wp$i"
-	# vhost_root="/root/webroot/$vhost_name"
-	# vhost_root=$( echo "$vhost_root" | sed 's/\//\\\//g' )
-	vhost_hostname="$vhost_name$APPEND_HOSTNAME"
+# FPM configuration: $VHOSTS pools
+if [[ $CONFIG == "fpm" ]]
+then
+	# Remove all active FPM pools
+	rm /etc/php/fpm-pool.d/*.conf
+	for (( i=1; i<=$VHOSTS; i++ ))
+	do
+		vhost_name="sp$i"
+		# vhost_root="/root/webroot/$vhost_name"
+		# vhost_root=$( echo "$vhost_root" | sed 's/\//\\\//g' )
+		vhost_hostname="$vhost_name$APPEND_HOSTNAME"
 
-	# Add user
-	if [[ $( cat /etc/passwd | egrep "^$vhost_name" ) == "" ]]
-	then
-		adduser --no-create-home --disabled-password --gecos dummy "$vhost_name" &>/dev/null || quit 1
-	fi
+		# Add user
+		if [[ $( cat /etc/passwd | egrep "^$vhost_name" ) == "" ]]
+		then
+			adduser --no-create-home --disabled-password --gecos dummy "$vhost_name" &>/dev/null || quit 1
+		fi
 
-	# Create FPM pool
-	mkdir -p /var/run/php-fpm/  || quit 1
-	pool_conf=$( echo "$TEMPLATE_FPM" | sed 's/{NAME}/'"$vhost_name"'/g' )
-	pool_conf=$( echo "$pool_conf" | sed 's/{SOCK_NAME}/'"$vhost_name"'/g' )
-	pool_conf=$( echo "$pool_conf" | sed 's/{USER}/'"$vhost_name"'/g' )
-	pool_conf=$( echo "$pool_conf" | sed 's/{GROUP}/'"$vhost_name"'/g' )
-	pool_conf=$( echo "$pool_conf" | sed 's/{CHILDREN}/'"$FPM_CHILDREN"'/g' )
-	pool_conf=$( echo "$pool_conf" | sed 's/{REQUESTS}/'"$FPM_REQUESTS"'/g' )
-	echo "$pool_conf" > "/etc/php/fpm-pool.d/$vhost_name.conf" || quit 1
+		# Create FPM pool
+		mkdir -p /var/run/php-fpm/  || quit 1
+		pool_conf=$( echo "$TEMPLATE_FPM" | sed 's/{NAME}/'"$vhost_name"'/g' )
+		pool_conf=$( echo "$pool_conf" | sed 's/{SOCK_NAME}/'"$vhost_name"'/g' )
+		pool_conf=$( echo "$pool_conf" | sed 's/{USER}/'"$vhost_name"'/g' )
+		pool_conf=$( echo "$pool_conf" | sed 's/{GROUP}/'"$vhost_name"'/g' )
+		pool_conf=$( echo "$pool_conf" | sed 's/{CHILDREN}/'"$FPM_CHILDREN"'/g' )
+		pool_conf=$( echo "$pool_conf" | sed 's/{REQUESTS}/'"$FPM_REQUESTS"'/g' )
+		echo "$pool_conf" > "/etc/php/fpm-pool.d/$vhost_name.conf" || quit 1
 	
-	nginx_socks="$nginx_socks        server unix:/var/run/php-fpm/$vhost_name.sock;
-"
-done
-killall php-fpm
-php-fpm --fpm-config /etc/php/fpm.conf
+		nginx_socks="$nginx_socks        server unix:/var/run/php-fpm/$vhost_name.sock;
+	"
+	done
+	killall php-fpm
+	php-fpm --fpm-config /etc/php/fpm.conf
+fi
+
+# Apache with mod_selinux
+if [[ $CONFIG == "modselinux" ]]
+then
+	echo "mod_selinux!"
+	quit 1
+fi
 
 # Create Nginx virtual host
 echo "upstream fpms {" > /etc/nginx/sites-available/selixperf
