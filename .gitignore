@@ -9,3 +9,8 @@
 performance_viewer/data/
 policy/*.pp
 policy/tmp/
+mod_selinux/.deps
+mod_selinux/.libs/
+mod_selinux/mod_selinux.l*
+mod_selinux/mod_selinux.o
+mod_selinux/mod_selinux.slo
