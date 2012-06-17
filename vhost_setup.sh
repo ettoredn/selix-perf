@@ -19,10 +19,34 @@ pm.max_requests = {REQUESTS}
 ;pm.min_spare_servers = 5
 ;pm.max_spare_servers = 5
 ;pm.status_path = /status'
+TEMPLATE_APACHE='
+<VirtualHost *:81>
+	ServerName {SERVERNAME}
+	DocumentRoot "/root/webroot"
+	<Directory "/root/webroot">
+		Options Indexes FollowSymLinks MultiViews
+		AllowOverride All
+		Order allow,deny
+		allow from 127.0.0.1
+	</Directory>
+	
+	<FilesMatch \.php$>
+	    SetHandler application/x-httpd-php
+	</FilesMatch>
+	
+	# mod_selinux parameters
+	selinuxDomainVal	sephp_httpd_t
+	
+	# selix parameters
+	# SetEnv SELINUX_DOMAIN		"sephp_php_t"
+	# SetEnv SELINUX_RANGE		"s0"
+	# SetEnv SELINUX_COMPILE_DOMAIN	"sephp_compile_php_t"
+	# SetEnv SELINUX_COMPILE_RANGE	"s0"
+</VirtualHost>'
 
 function usage {
 	echo "Usage: $0 [--vhosts n] [--children n] [--requests n] [--enable-selix] [--conf <fpm|fpmvm|modselinux>]"
-	quit 1
+	quit 0
 }
 
 function quit {
@@ -109,7 +133,7 @@ if [[ $CONFIG == "fpm" ]]
 then
 	# Remove all active FPM pools
 	rm /etc/php/fpm-pool.d/*.conf
-	for (( i=1; i<=$VHOSTS; i++ ))
+	for (( i=0; i<$VHOSTS; i++ ))
 	do
 		vhost_name="sp$i"
 		# vhost_root="/root/webroot/$vhost_name"
@@ -133,46 +157,85 @@ then
 		echo "$pool_conf" > "/etc/php/fpm-pool.d/$vhost_name.conf" || quit 1
 	
 		nginx_socks="$nginx_socks        server unix:/var/run/php-fpm/$vhost_name.sock;
-	"
+"
 	done
 	killall php-fpm
 	php-fpm --fpm-config /etc/php/fpm.conf
+	
+	# Create Nginx virtual host
+	echo "upstream fpms {" > /etc/nginx/sites-available/selixperf
+	echo -n "$nginx_socks" >> /etc/nginx/sites-available/selixperf
+	echo "}" >> /etc/nginx/sites-available/selixperf
+	echo -n "
+	server {
+	        listen   80;
+	        server_name selixperf.dev;
+	        root \"/root/webroot\";
+
+	        location / {
+	                autoindex on;
+	                index index.php;
+	        }
+
+	        location ~ ^/phpsqlitecms/.+\.php$ {
+	                fastcgi_pass fpms;
+	                include fastcgi_params;
+					fastcgi_keep_conn off;
+					fastcgi_param SELINUX_DOMAIN			\"sephp_php_t\";
+					fastcgi_param SELINUX_RANGE				\"s0\";
+					fastcgi_param SELINUX_COMPILE_DOMAIN	\"sephp_compile_php_t\";
+					fastcgi_param SELINUX_COMPILE_RANGE		\"s0\";
+	        }
+	}
+	" >> /etc/nginx/sites-available/selixperf
 fi
 
 # Apache with mod_selinux
 if [[ $CONFIG == "modselinux" ]]
 then
-	echo "mod_selinux!"
-	quit 1
+	# Include mod_selinux configuration	
+	a2enmod mod_selinux >/dev/null || quit 1
+	
+	# Remove all active Apache virtual hosts
+	rm /etc/apache2/sites-enabled/* &>/dev/null
+	rm /etc/apache2/sites-available/*  &>/dev/null
+	vhost_file=""
+	for (( i=0; i<$VHOSTS; i++ ))
+	do
+		vhost_name="sp$i"
+		vhost_hostname="$vhost_name$APPEND_HOSTNAME"
+		vhost_conf=$( echo "$TEMPLATE_APACHE" | sed 's/{SERVERNAME}/'"$vhost_hostname"'/g' )
+		vhost_file="$vhost_file$vhost_conf"
+	done
+	nginx_socks="$nginx_socks        server localhost:81;
+"
+	
+	echo "$vhost_file" > /etc/apache2/sites-available/selixperf || quit 1
+	ln -s "/etc/apache2/sites-available/selixperf" "/etc/apache2/sites-enabled/selixperf" 2>/dev/null
+	# Reload server configuration
+	/etc/init.d/apache2 restart &>/dev/null || ( echo "Error restarting Apache" >&2 && quit 1 )
+	
+	# Create Nginx virtual host
+	echo '
+	server {
+	        listen   80;
+	        server_name selixperf.dev;
+	        root \"/root/webroot\";
+
+	        location / {
+	                autoindex on;
+	                index index.php;
+	        }
+
+	        location /phpsqlitecms/ {
+	                proxy_pass http://127.0.0.1:81/phpsqlitecms/;
+	                proxy_set_header Host $host;
+	        }
+	}' > /etc/nginx/sites-available/selixperf
 fi
 
-# Create Nginx virtual host
-echo "upstream fpms {" > /etc/nginx/sites-available/selixperf
-echo -n "$nginx_socks" >> /etc/nginx/sites-available/selixperf
-echo "}" >> /etc/nginx/sites-available/selixperf
-echo -n "
-server {
-        listen   80;
-        server_name selixperf.dev;
-        root \"/root/webroot\";
-
-        location / {
-                autoindex on;
-                index index.php;
-        }
-
-        location ~ ^/phpsqlitecms/.+\.php$ {
-                fastcgi_pass fpms;
-                include fastcgi_params;
-				fastcgi_param SELINUX_DOMAIN			\"sephp_php_t\";
-				fastcgi_param SELINUX_RANGE				\"s0\";
-				fastcgi_param SELINUX_COMPILE_DOMAIN	\"sephp_compile_php_t\";
-				fastcgi_param SELINUX_COMPILE_RANGE		\"s0\";
-        }
-}
-" >> /etc/nginx/sites-available/selixperf
+# Reload nginx configuration
 ln -s "/etc/nginx/sites-available/selixperf" "/etc/nginx/sites-enabled/selixperf" 2>/dev/null
-# Reload server configuration
 /etc/init.d/nginx reload >/dev/null || quit 1
 
 # Drop caches

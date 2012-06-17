@@ -4,9 +4,11 @@ SETUP_APT=""
 BUILD_PHP=""
 BUILD_SELIX=""
 BUILD_SYSSTAT=""
+BUILD_MODSELINUX=""
+BUILD_POLICY=""
 function usage {
-	echo "Usage: $0 [--all|-a] [--apt] [--php] [--selix] [--sysstat]"
-	quit 1
+	echo "Usage: $0 [--all|-a] [--apt] [--php] [--selix] [--sysstat] [--modselinux] [--policy]"
+	quit 0
 }
 
 function quit {
@@ -22,16 +24,18 @@ cwd=$( dirname "$abspath" )
 ecwd=$( echo $cwd | sed 's/\//\\\//g' )
 
 # Evaluate options
-newopts=$( getopt -n"$0" --longoptions "all,apt,php,selix,sysstat,help" "ah" "$@" ) || usage
+newopts=$( getopt -n"$0" --longoptions "all,apt,php,selix,sysstat,modselinux,policy,help" "ah" "$@" ) || usage
 set -- $newopts
 while (( $# >= 0 ))
 do
 	case "$1" in
-		--all | -a)		SETUP_APT=1; BUILD_PHP=1; BUILD_SELIX=1; BUILD_SYSSTAT=1;shift;;
+		--all | -a)		SETUP_APT=1; BUILD_PHP=1; BUILD_SELIX=1; BUILD_SYSSTAT=1; BUILD_MODSELINUX; BUILD_POLICY;shift;;
 		--apt)			SETUP_APT=1;shift;;
 		--php)			BUILD_PHP=1;shift;;
 		--selix)		BUILD_SELIX=1;shift;;
 		--sysstat)		BUILD_SYSSTAT=1;shift;;
+		--modselinux)	BUILD_MODSELINUX=1;shift;;
+		--policy)		BUILD_POLICY=1;shift;;
 		--help | -h) usage;;
 		--) shift;break;;
 	esac
@@ -280,6 +284,10 @@ soap.wsdl_cache_dir="/tmp"
 soap.wsdl_cache_ttl=86400
 soap.wsdl_cache_limit = 5
 ' > /etc/php/php.ini
+# Apache configuration
+echo "LoadModule php5_module    /usr/lib/apache2/modules/libphp5.so" > /etc/apache2/mods-available/php5.load
+a2enmod php5 &>/dev/null || quit 1
+a2enmod rewrite &>/dev/null || quit 1
 
 #### SELIX
 if [[ ! -d ~/selix ]]
@@ -307,6 +315,29 @@ echo '
 NameVirtualHost *:81
 Listen 81
 ' > /etc/apache2/ports.conf
+echo 'KeepAlive Off
+<IfModule mpm_prefork_module>
+    StartServers          5
+    MinSpareServers       5
+    MaxSpareServers       5
+    MaxClients          256
+    MaxRequestsPerChild   0
+</IfModule>
+' > /etc/apache2/conf.d/selixperf
+
+#### mod_selinux
+if [[ ! -d "$cwd/mod_selinux" ]]
+then
+	echo "*** mod_selinux source is missing." >&2 && quit 1
+fi
+if [[ $BUILD_MODSELINUX != "" ]]
+then
+	echo -e "\nBuilding mod_selinux ..."
+	cp -R "$cwd/mod_selinux" ~/mod_selinux && cd ~/mod_selinux
+	make clean || quit 1
+	make || quit 1
+	make install || quit 1
+fi
 
 #### NGINX
 echo -e "\nSetting up nxing ..."
@@ -328,7 +359,7 @@ fi
 
 # SELinux policy
 $( selinuxenabled )
-if (( $? == 0 ))
+if [[ $? == 0 && $BUILD_POLICY != "" ]]
 then
 	# SELinux enabled, load apache policy
 	echo -e "\nBuilding policy modules for mod_selinux PHP-FPM and virtualhosts ..."
