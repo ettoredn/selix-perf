@@ -104,10 +104,15 @@ if (!empty($_GET['session']))
 //        $fpmMemoryBuffers = $s->PlotResourceUsage("GetMemoryBuffersMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
 //        $fpmMemoryCached = $s->PlotResourceUsage("GetMemoryCachedMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
     }
-    if ($s->ConfigurationExists("selix"))
+    if ($s->ConfigurationExists("fpm_selix"))
     {
-        $selixCPUUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "selix"), "GetChildren");
-        $selixMemoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "selix"), "GetChildren");
+        $selixCPUUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "fpm_selix"), "GetChildren");
+        $selixMemoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "fpm_selix"), "GetChildren");
+    }
+    if ($s->ConfigurationExists("modselinux"))
+    {
+        $modselinuxCPUUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "modselinux"), "GetChildren");
+        $modselinuxMemoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "modselinux"), "GetChildren");
     }
 
     $raw = $s->GetData("GetMemoryUsageMiB", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
@@ -122,10 +127,15 @@ if (!empty($_GET['session']))
 //        echo "<img src='$fpmMemoryBuffers' width='731' height='549'/>";
 //        echo "<img src='$fpmMemoryCached' width='731' height='549'/>";
     }
-    if ($s->ConfigurationExists("selix"))
+    if ($s->ConfigurationExists("fpm_selix"))
     {
         echo "<img src='$selixCPUUsage' width='731' height='549'/>";
         echo "<img src='$selixMemoryUsage' width='731' height='549'/>";
+    }
+    if ($s->ConfigurationExists("modselinux"))
+    {
+        echo "<img src='$modselinuxCPUUsage' width='731' height='549'/>";
+        echo "<img src='$modselinuxMemoryUsage' width='731' height='549'/>";
     }
 
     echo '<p><a href="javascript:void(0)" onclick="switchRawData();">Show/hide raw data</a></p>';

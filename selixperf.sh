@@ -178,6 +178,12 @@ echo -e "\nLoading system activity into database ..."
 sqltmpfile="$SQL_TMP_PATH/perf_$perf_session.sql"
 echo "START TRANSACTION;" > "$sqltmpfile"
 
+# Adds "_selix" if selix is enabled
+if [[ "$ENABLE_SELIX" == "--enable-selix" ]]
+then
+	CONFIG="${CONFIG}_selix"
+fi
+
 secs=0
 while read line
 do
