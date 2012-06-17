@@ -125,8 +125,21 @@ else
 	rm "/etc/php/conf.d/selix.ini" &>/dev/null
 fi
 
+if [[ "$CONFIG" == "modselinux" ]]
+then
+	# Force only 1 vhost with an equivalent number of children
+	FPM_CHILDREN=$(( VHOSTS * FPM_CHILDREN ))
+	VHOSTS=1
+fi
+
 echo "$VHOSTS vhosts, $FPM_CHILDREN children, $FPM_REQUESTS requests, \
 $(( $VHOSTS * $FPM_CHILDREN )) processes"
+
+# Stop servers
+sleep 1
+/etc/init.d/nginx stop
+/etc/init.d/apache2 stop
+killall php-fpm &>/dev/null
 
 # FPM configuration: $VHOSTS pools
 if [[ $CONFIG == "fpm" ]]
@@ -159,7 +172,6 @@ then
 		nginx_socks="$nginx_socks        server unix:/var/run/php-fpm/$vhost_name.sock;
 "
 	done
-	killall php-fpm
 	php-fpm --fpm-config /etc/php/fpm.conf
 	
 	# Create Nginx virtual host
@@ -199,19 +211,24 @@ then
 	# Remove all active Apache virtual hosts
 	rm /etc/apache2/sites-enabled/* &>/dev/null
 	rm /etc/apache2/sites-available/*  &>/dev/null
-	vhost_file=""
-	for (( i=0; i<$VHOSTS; i++ ))
-	do
-		vhost_name="sp$i"
-		vhost_hostname="$vhost_name$APPEND_HOSTNAME"
-		vhost_conf=$( echo "$TEMPLATE_APACHE" | sed 's/{SERVERNAME}/'"$vhost_hostname"'/g' )
-		vhost_file="$vhost_file$vhost_conf"
-	done
-	nginx_socks="$nginx_socks        server localhost:81;
-"
 	
+	# Only one virtual host
+	vhost_hostname="selixperf.dev"
+	vhost_conf=$( echo "$TEMPLATE_APACHE" | sed 's/{SERVERNAME}/'"$vhost_hostname"'/g' )
+	vhost_file="$vhost_file$vhost_conf"
 	echo "$vhost_file" > /etc/apache2/sites-available/selixperf || quit 1
 	ln -s "/etc/apache2/sites-available/selixperf" "/etc/apache2/sites-enabled/selixperf" 2>/dev/null
+	
+	echo "KeepAlive Off
+	<IfModule mpm_prefork_module>
+	    StartServers          $FPM_CHILDREN
+	    MinSpareServers       $FPM_CHILDREN
+	    MaxSpareServers       $FPM_CHILDREN
+	    MaxClients          256
+	    MaxRequestsPerChild   $FPM_REQUESTS
+	</IfModule>
+	" > /etc/apache2/conf.d/selixperf
+		
 	# Reload server configuration
 	/etc/init.d/apache2 restart &>/dev/null || ( echo "Error restarting Apache" >&2 && quit 1 )
 	
@@ -236,7 +253,7 @@ fi
 
 # Reload nginx configuration
 ln -s "/etc/nginx/sites-available/selixperf" "/etc/nginx/sites-enabled/selixperf" 2>/dev/null
-/etc/init.d/nginx reload >/dev/null || quit 1
+/etc/init.d/nginx start >/dev/null || quit 1
 
 # Drop caches
 sync && echo 3 >/proc/sys/vm/drop_caches

@@ -315,15 +315,6 @@ echo '
 NameVirtualHost *:81
 Listen 81
 ' > /etc/apache2/ports.conf
-echo 'KeepAlive Off
-<IfModule mpm_prefork_module>
-    StartServers          5
-    MinSpareServers       5
-    MaxSpareServers       5
-    MaxClients          256
-    MaxRequestsPerChild   0
-</IfModule>
-' > /etc/apache2/conf.d/selixperf
 
 #### mod_selinux
 if [[ ! -d "$cwd/mod_selinux" ]]
