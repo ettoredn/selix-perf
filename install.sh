@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Kernel build:  http://www.debian.org/releases/stable/i386/ch08s06.html.en
 SETUP_APT=""
 BUILD_PHP=""
 BUILD_SELIX=""
