@@ -117,7 +117,7 @@ class Session
         $cleanResource = preg_replace('/^Get/', '', $resourceProperty);
         $cleanFilter = strtolower(preg_replace('/^Get/', '', $filterByProperty));
         $cleanGroupBy = strtolower(preg_replace('/^Get/', '', $groupByProperty));
-        $title = $cleanResource ." with $cleanFilter $filterByValue  (".($this->httpConnectionsRate)." connections/sec)";
+        $title = $cleanResource ." with $cleanFilter $filterByValue  (".($this->httpConnectionsRate)." requests/sec)";
 
         // If already generated returns it
         if (file_exists(Gnuplot::DATAPATH.$filename) && !$GLOBALS['disable_cache'])
@@ -207,7 +207,7 @@ class Session
         $cleanResource = preg_replace('/^Get/', '', $resourceProperty);
         $cleanFilter = strtolower(preg_replace('/^Get/', '', $filterByProperty));
         $cleanGroupBy = strtolower(preg_replace('/^Get/', '', $groupByProperty));
-        $title = $cleanResource ." with $cleanFilter $filterByValue  (".($this->httpConnectionsRate)." connections/sec)";
+        $title = $cleanResource ." with $cleanFilter $filterByValue  (".($this->httpConnectionsRate)." requests/sec)";
 
         // If already generated returns it
         if (file_exists(Gnuplot::DATAPATH.$filename) && !$GLOBALS['disable_cache'])
