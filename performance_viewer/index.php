@@ -109,8 +109,8 @@ if (!empty($_GET['session']))
     }
     if ($s->ConfigurationExists("modselinux"))
     {
-        $modselinuxCPUUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "modselinux"), "GetVhosts");
-        $modselinuxMemoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "modselinux"), "GetVhosts");
+        $modselinuxCPUUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "modselinux"), "GetChildren");
+        $modselinuxMemoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "modselinux"), "GetChildren");
     }
 
     $raw = $s->GetData("GetMemoryUsageMiB", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
