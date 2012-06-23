@@ -270,8 +270,8 @@ session.entropy_length = 0
 session.cache_limiter = nocache
 session.cache_expire = 180
 session.use_trans_sid = 0
-session.hash_function = 0
-session.hash_bits_per_character = 5
+session.hash_function = "sha512"
+session.hash_bits_per_character = 6
 url_rewriter.tags = "a=href,area=href,frame=src,input=src,form=fakeentry"
 
 [Tidy]
