@@ -101,8 +101,6 @@ if (!empty($_GET['session']))
     {
         $cpuUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "fpm"), "GetVhosts");
         $memoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
-//        $fpmMemoryBuffers = $s->PlotResourceUsage("GetMemoryBuffersMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
-//        $fpmMemoryCached = $s->PlotResourceUsage("GetMemoryCachedMiB", array("GetConfiguration" => "fpm"), "GetVhosts");
     }
     if ($s->ConfigurationExists("fpm_selix"))
     {
@@ -111,8 +109,8 @@ if (!empty($_GET['session']))
     }
     if ($s->ConfigurationExists("modselinux"))
     {
-        $modselinuxCPUUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "modselinux"), "GetChildren");
-        $modselinuxMemoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "modselinux"), "GetChildren");
+        $modselinuxCPUUsage = $s->PlotRelativeResourceUsage("GetCPUUsage", array("GetConfiguration" => "modselinux"), "GetVhosts");
+        $modselinuxMemoryUsage = $s->PlotResourceUsage("GetMemoryUsageMiB", array("GetConfiguration" => "modselinux"), "GetVhosts");
     }
 
     $raw = $s->GetData("GetMemoryUsageMiB", array("GetConfiguration" => array(null, "fpm")), array("GetVhosts" => null));
