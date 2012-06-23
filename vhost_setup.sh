@@ -120,6 +120,12 @@ else
 	rm "/etc/php/conf.d/selix.ini" &>/dev/null
 fi
 
+if [[ "$CONFIG" == "modselinux" ]]
+then
+	# Force only 1 vhost with an equivalent number of children
+	FPM_CHILDREN=$(( VHOSTS * FPM_CHILDREN ))
+fi
+
 echo "$VHOSTS vhosts, $FPM_CHILDREN children, $FPM_REQUESTS requests, \
 $(( $VHOSTS * $FPM_CHILDREN )) processes"
 
