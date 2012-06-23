@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-TARGET_USER="root"
 TARGET_HOST="selixperf.dev"
+TARGET_SSH_USER="root"
 SETUP_SCRIPT="~/selixperf/vhost_setup.sh"
 CONFIG=""
 VHOSTS=""
 FPM_CHILDREN=""
 FPM_REQUESTS=""
+FPM_STARTPORT=9000
+PERF_HOST="localhost"
+PERF_PORT="81"
 PERF_URI="/phpsqlitecms/"
 PERF_CONN="500"
-PERF_RATE="4"
+PERF_RATE="80"
 ENABLE_SELIX=0
 SQL_TMP_PATH="/dev/shm"
 DB_USER="root"
@@ -30,7 +33,7 @@ function quit {
 
 function kill_sysstat {
 	echo -e "\nKilling sysstat on remote host ..."
-	ssh "$TARGET_USER@$TARGET_HOST" "kill -SIGTERM $sar_pid"	
+	ssh "$TARGET_SSH_USER@$TARGET_HOST" "kill -SIGTERM $sar_pid"	
 }
 
 trap "{
@@ -74,7 +77,7 @@ do
 						perf_session="$last_session"
 					fi
 					shift;;
-		--server)	TARGET_HOST=$( echo $2 | sed "s/'//g" )
+		--server)	PERF_HOST=$( echo $2 | sed "s/'//g" )
 					shift;shift;;
 		--conf)		CONFIG=$( echo $2 | sed "s/'//g" )
 					shift;shift;;
@@ -149,7 +152,7 @@ then
 fi
 
 echo -ne "Executing vhosts setup script on remote host $SERVER ...\n\t"
-vhost_output=$( ssh "$TARGET_USER@$TARGET_HOST" "$SETUP_SCRIPT $ENABLE_SELIX $VHOSTS $FPM_CHILDREN $FPM_REQUESTS --conf=$CONFIG" )
+vhost_output=$( ssh "$TARGET_SSH_USER@$TARGET_HOST" "$SETUP_SCRIPT $ENABLE_SELIX $VHOSTS $FPM_CHILDREN $FPM_REQUESTS --conf=$CONFIG" )
 if [[ $? != 0 ]]
 then
 	echo "*** Error executing vhosts setup script" >&2 && quit 1
@@ -163,26 +166,101 @@ FPM_CHILDREN="${tokens[1]}"
 FPM_REQUESTS="${tokens[2]}"
 
 echo -ne "\nExecuting sysstat on remote host ...\n\t"
-ssh "$TARGET_USER@$TARGET_HOST" "rm perf.sa"
-ssh "$TARGET_USER@$TARGET_HOST" "sar 1 -o perf.sa &>/dev/null &" || quit 1
-sar_pid=$( ssh "$TARGET_USER@$TARGET_HOST" "ps -eF" | egrep 'sar 1 -o perf' | egrep -v 'egrep' | awk '{print $2}' )
+ssh "$TARGET_SSH_USER@$TARGET_HOST" "rm perf.sa"
+ssh "$TARGET_SSH_USER@$TARGET_HOST" "sar 1 -o perf.sa &>/dev/null &" || quit 1
+sar_pid=$( ssh "$TARGET_SSH_USER@$TARGET_HOST" "ps -eF" | egrep 'sar 1 -o perf' | egrep -v 'egrep' | awk '{print $2}' )
 echo "PID: $sar_pid"
-sleep 5
-
-echo -e "\nExecuting httperf, estimated time $(( PERF_CONN / PERF_RATE ))s ..."
-httperf --hog --server="$TARGET_HOST" --uri="$PERF_URI" --num-con="$PERF_CONN" --rate="$PERF_RATE" || quit 1
-
-kill_sysstat
-
-echo -e "\nLoading system activity into database ..."
-sqltmpfile="$SQL_TMP_PATH/perf_$perf_session.sql"
-echo "START TRANSACTION;" > "$sqltmpfile"
 
 # Adds "_selix" if selix is enabled
 if [[ "$ENABLE_SELIX" == "--enable-selix" ]]
 then
 	CONFIG="${CONFIG}_selix"
 fi
+
+sudo /etc/init.d/nginx stop
+
+echo -ne "\nSetting up nginx ...\n"
+if [[ "$CONFIG" == "fpm" ]]
+then
+	for (( i=0; i<$VHOSTS; i++ ))
+	do
+		nginx_socks="$nginx_socks        server $TARGET_HOST:$FPM_STARTPORT;
+"
+		(( FPM_STARTPORT++ ))
+	done
+	
+	# Create Nginx virtual host
+	sudo chmod 666 /etc/nginx/sites-enabled/selixperf
+	echo "upstream fpms {" > /etc/nginx/sites-available/selixperf
+	echo -n "$nginx_socks" >> /etc/nginx/sites-available/selixperf
+	echo "}" >> /etc/nginx/sites-available/selixperf
+	echo -n "
+server {
+	listen   81;
+	server_name sephp.dev;
+	root \"/root/webroot\";
+
+	location = /phpsqlitecms/ {
+		try_files \$uri \$uri/index.php;
+	}
+
+	location ~ ^/phpsqlitecms/.+\.php$ {
+		fastcgi_pass fpms;
+		include fastcgi_params;
+		fastcgi_keep_conn on;
+		fastcgi_param SELINUX_DOMAIN			\"sephp_php_t\";
+		fastcgi_param SELINUX_RANGE				\"s0\";
+		fastcgi_param SELINUX_COMPILE_DOMAIN	\"sephp_compile_php_t\";
+		fastcgi_param SELINUX_COMPILE_RANGE		\"s0\";
+	}
+}
+" >> /etc/nginx/sites-available/selixperf
+fi
+
+if [[ "$CONFIG" == "modselinux" ]]
+then
+	for (( i=0; i<$VHOSTS; i++ ))
+	do
+		nginx_locations="$nginx_locations
+        location /phpsqlitecms/${i}/ {
+			proxy_pass http://selixperf.dev:81/phpsqlitecms/;
+			proxy_set_header Host sp${i}.selixperf.dev;
+        }"
+		perf_uris="${perf_uris}/phpsqlitecms/${i}/\0"
+	done
+	# Write urls
+	echo -en "$perf_uris" > "$cwd/uris.txt"
+	
+	# Create Nginx virtual host
+	sudo chmod 666 /etc/nginx/sites-enabled/selixperf
+	echo -n "
+server {
+	listen   81;
+	server_name sephp.dev;
+	root \"/root/webroot\";
+	
+	$nginx_locations
+}
+" > /etc/nginx/sites-available/selixperf
+fi
+
+sudo /etc/init.d/nginx start
+# kill_sysstat && quit 0
+
+sleep 5
+# httperf
+echo -e "\nExecuting httperf, estimated time $(( PERF_CONN / PERF_RATE ))s ..."
+if [[ "$CONFIG" == "modselinux" ]]
+then
+	httperf --hog --server="$PERF_HOST" --port="$PERF_PORT" --wlog="y,${cwd}/uris.txt" --num-con="$PERF_CONN" --rate="$PERF_RATE" || quit 1
+else
+	httperf --hog --server="$PERF_HOST" --port="$PERF_PORT" --uri="$PERF_URI" --num-con="$PERF_CONN" --rate="$PERF_RATE" || quit 1
+fi
+kill_sysstat
+
+echo -e "\nLoading system activity into database ..."
+sqltmpfile="$SQL_TMP_PATH/perf_$perf_session.sql"
+echo "START TRANSACTION;" > "$sqltmpfile"
 
 secs=0
 while read line
@@ -205,7 +283,7 @@ do
 	echo $sql >> "$sqltmpfile"
 	
 	echo "($secs) user $cpu_user%, sys $cpu_system%, idle $cpu_idle%, mem $mem_used_kb, mem $mem_used%"
-done <<< "$( ssh "$TARGET_USER@$TARGET_HOST" "sadf -dht -- -ru perf.sa" )"
+done <<< "$( ssh "$TARGET_SSH_USER@$TARGET_HOST" "sadf -dht -- -ru perf.sa" )"
 
 echo "INSERT INTO $DB_TABLE_TEST (test, session, configuration, vhosts, children, \
  	  child_requests, perf_connections, perf_rate) \
